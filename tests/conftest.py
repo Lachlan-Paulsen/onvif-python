@@ -1,8 +1,10 @@
 # tests/conftest.py
 
-import pytest
 from unittest.mock import Mock, patch
-from onvif import ONVIFClient, CacheMode
+
+import pytest
+
+from onvif import CacheMode, ONVIFClient
 
 
 @pytest.fixture

@@ -1,5 +1,6 @@
-from onvif.services import Provisioning
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import Provisioning
 
 
 class TestProvisioningWSDLCompliance(ONVIFServiceTestBase):

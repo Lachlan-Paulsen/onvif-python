@@ -1,5 +1,6 @@
-from onvif.services import DeviceIO
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import DeviceIO
 
 
 class TestDeviceIOWSDLCompliance(ONVIFServiceTestBase):

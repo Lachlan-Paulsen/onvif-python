@@ -1,5 +1,6 @@
-from onvif.services import TLSServer
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import TLSServer
 
 
 class TestTLSServerWSDLCompliance(ONVIFServiceTestBase):

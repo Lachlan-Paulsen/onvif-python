@@ -1,5 +1,6 @@
-from onvif.services import AuthorizationServer
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import AuthorizationServer
 
 
 class TestAuthorizationServerWSDLCompliance(ONVIFServiceTestBase):

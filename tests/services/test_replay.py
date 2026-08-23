@@ -1,5 +1,6 @@
-from onvif.services import Replay
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import Replay
 
 
 class TestReplayWSDLCompliance(ONVIFServiceTestBase):

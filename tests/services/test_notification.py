@@ -1,5 +1,6 @@
-from onvif.services import Notification
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import Notification
 
 
 class TestNotificationWSDLCompliance(ONVIFServiceTestBase):

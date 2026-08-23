@@ -1,5 +1,6 @@
-from onvif.services import Media
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import Media
 
 
 class TestMediaWSDLCompliance(ONVIFServiceTestBase):

@@ -1,5 +1,6 @@
-from onvif.services import Schedule
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import Schedule
 
 
 class TestScheduleWSDLCompliance(ONVIFServiceTestBase):

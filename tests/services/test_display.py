@@ -1,5 +1,6 @@
-from onvif.services import Display
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import Display
 
 
 class TestDisplayWSDLCompliance(ONVIFServiceTestBase):

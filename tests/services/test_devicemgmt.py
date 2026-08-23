@@ -1,5 +1,6 @@
-from onvif.services import Device
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import Device
 
 
 class TestDeviceMgmtWSDLCompliance(ONVIFServiceTestBase):
