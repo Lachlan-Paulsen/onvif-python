@@ -11,7 +11,7 @@ support certain features.
 Applied for (>= v0.0.7 patch)
 """
 
-from onvif import ONVIFClient, CacheMode, ONVIFErrorHandler, ONVIFOperationException
+from onvif import CacheMode, ONVIFClient, ONVIFErrorHandler, ONVIFOperationException
 
 HOST = "192.168.1.14"
 PORT = 2020

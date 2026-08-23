@@ -18,11 +18,11 @@ Note:
 """
 
 import socket
-import uuid
-from lxml import etree
-import sys
 import struct
+import sys
+import uuid
 
+from lxml import etree
 
 # WS-Discovery constants
 WS_DISCOVERY_TIMEOUT = 4  # 4 seconds - time to wait to receive packets

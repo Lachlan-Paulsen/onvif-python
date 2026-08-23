@@ -22,13 +22,13 @@ Example:
     python logger.py --level INFO           # Only info, errors, warnings
 """
 
-import sys
-import logging
 import argparse
-from datetime import datetime
+import logging
 import os
+import sys
+from datetime import datetime
 
-from onvif import ONVIFClient, ONVIFDiscovery, ONVIFWSDL
+from onvif import ONVIFWSDL, ONVIFClient, ONVIFDiscovery
 
 
 def setup_logging(level=logging.INFO):

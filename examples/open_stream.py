@@ -8,9 +8,10 @@ This script connects to an ONVIF-compliant device, retrieves the RTSP stream URI
 and opens the video stream using OpenCV.
 """
 
-import cv2
 import sys
 import urllib.parse
+
+import cv2
 
 from onvif import ONVIFClient
 
