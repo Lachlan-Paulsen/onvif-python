@@ -139,3 +139,33 @@ class Recording(ONVIFService):
             Expiration=Expiration,
             RecordingConfiguration=RecordingConfiguration,
         )
+
+    def ListRecordedSegments(self, Time, RecordingToken, MaxResults=None):
+        return self.operator.call(
+            "ListRecordedSegments",
+            Time=Time,
+            RecordingToken=RecordingToken,
+            MaxResults=MaxResults,
+        )
+
+    def ExportRecordedSegments(
+        self,
+        Time,
+        RecordingToken,
+        Alias=None,
+        StorageToken=None,
+        Track=None,
+    ):
+        return self.operator.call(
+            "ExportRecordedSegments",
+            Time=Time,
+            RecordingToken=RecordingToken,
+            Alias=Alias,
+            StorageToken=StorageToken,
+            Track=Track,
+        )
+
+    def StopExportRecordedSegments(self, OperationToken):
+        return self.operator.call(
+            "StopExportRecordedSegments", OperationToken=OperationToken
+        )

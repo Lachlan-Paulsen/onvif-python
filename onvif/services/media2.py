@@ -311,6 +311,14 @@ class Media2(ONVIFService):
             RepeatCycles=RepeatCycles,
         )
 
+    def AddTTSAudioClip(self, Configuration, TTSConfiguration, Token=None):
+        return self.operator.call(
+            "AddTTSAudioClip",
+            Token=Token,
+            Configuration=Configuration,
+            TTSConfiguration=TTSConfiguration,
+        )
+
     def GetPlayingAudioClips(self):
         return self.operator.call("GetPlayingAudioClips")
 
