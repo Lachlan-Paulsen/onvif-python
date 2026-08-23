@@ -1,8 +1,9 @@
 # onvif/utils/xml_capture.py
 
 import logging
-from zeep import Plugin
+
 from lxml import etree
+from zeep import Plugin
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

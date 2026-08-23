@@ -1,11 +1,12 @@
 # onvif/utils/discovery.py
 
-import socket
-import uuid
-import struct
 import logging
+import socket
+import struct
+import uuid
+from typing import Any, Dict, List, Optional
+
 from lxml import etree
-from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

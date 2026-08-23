@@ -1,7 +1,8 @@
 # onvif/utils/parser.py
 
 import logging
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 from zeep import Plugin
 
 logger = logging.getLogger(__name__)

@@ -1,7 +1,7 @@
 # onvif/utils/wsdl.py
 
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

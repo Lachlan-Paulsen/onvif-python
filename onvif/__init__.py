@@ -2,17 +2,17 @@
 
 __version__ = "0.2.10"
 
+from .cli import main as ONVIFCLI
 from .client import ONVIFClient
 from .operator import CacheMode
 from .utils import (
     ONVIFWSDL,
-    ONVIFOperationException,
-    ONVIFErrorHandler,
-    ZeepPatcher,
     ONVIFDiscovery,
+    ONVIFErrorHandler,
+    ONVIFOperationException,
     ONVIFParser,
+    ZeepPatcher,
 )
-from .cli import main as ONVIFCLI
 
 __all__ = [
     "ONVIFClient",

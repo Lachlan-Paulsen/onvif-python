@@ -1,12 +1,12 @@
 # onvif/cli/utils.py
 
+import inspect
 import json
 import os
-import inspect
-from typing import Any, Dict, Optional
-from lxml import etree
 import re
+from typing import Any, Dict, Optional
 
+from lxml import etree
 
 # ONVIF namespace to service name mapping (used globally)
 # Format: namespace -> list of (service_name, binding_pattern)

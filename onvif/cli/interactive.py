@@ -1,31 +1,31 @@
 # onvif/cli/interactive.py
 
 import cmd
-import sys
+import os
 import socket
 import ssl
-import os
-import threading
+import sys
 import textwrap
+import threading
 from datetime import datetime
 from typing import List
 
-from zeep.exceptions import TransportError, Fault
 from requests.exceptions import RequestException
+from zeep.exceptions import Fault, TransportError
 
 from .. import __version__
 from ..client import ONVIFClient
 from ..utils.exceptions import ONVIFOperationException
 from .utils import (
-    parse_json_params,
-    get_service_methods,
-    get_service_required_args,
-    get_device_available_services,
     colorize,
     format_capabilities_as_services,
     format_services_list,
+    get_device_available_services,
     get_method_documentation,
     get_operation_type_info,
+    get_service_methods,
+    get_service_required_args,
+    parse_json_params,
 )
 
 
@@ -496,8 +496,8 @@ class InteractiveShell(cmd.Cmd):
         Returns:
             Parameter string with substituted values
         """
-        import re
         import json
+        import re
 
         # Find all $variable references (e.g., $profiles[0].token)
         pattern = (

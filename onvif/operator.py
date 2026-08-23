@@ -1,13 +1,13 @@
 # onvif/operator.py
 
+import logging
 import os
 import warnings
-import logging
+from enum import Enum
+
 import requests
 import urllib3
-
-from enum import Enum
-from zeep import Settings, Transport, Client, CachingClient
+from zeep import CachingClient, Client, Settings, Transport
 from zeep.cache import SqliteCache
 from zeep.exceptions import Fault
 from zeep.wsse.username import UsernameToken

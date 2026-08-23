@@ -1,13 +1,13 @@
 # onvif/cli/main.py
 
 import argparse
-import sys
-import warnings
 import getpass
-import sqlite3
+import json
 import os
 import shutil
-import json
+import sqlite3
+import sys
+import warnings
 from datetime import datetime
 from typing import Any, Optional, Tuple
 
@@ -16,7 +16,7 @@ from ..client import ONVIFClient
 from ..operator import CacheMode
 from ..utils.discovery import ONVIFDiscovery
 from .interactive import InteractiveShell
-from .utils import parse_json_params, colorize
+from .utils import colorize, parse_json_params
 
 
 def create_parser():

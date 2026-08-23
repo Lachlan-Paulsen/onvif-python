@@ -1,7 +1,9 @@
 # onvif/utils/service.py
 
 import logging
+
 import zeep.helpers
+
 from .exceptions import ONVIFOperationException
 
 logger = logging.getLogger(__name__)

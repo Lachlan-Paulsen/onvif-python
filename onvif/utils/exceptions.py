@@ -1,7 +1,7 @@
 # onvif/utils/exceptions.py
 
-from zeep.exceptions import Fault
 import requests
+from zeep.exceptions import Fault
 
 
 class ONVIFOperationException(Exception):
