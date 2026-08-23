@@ -152,3 +152,67 @@ class Search(ONVIFService):
             MaxResults=MaxResults,
             WaitTime=WaitTime,
         )
+
+    def SearchImageByNL(
+        self,
+        StartPoint,
+        Text,
+        KeepAliveTime,
+        EndPoint=None,
+        RecordingToken=None,
+        Similarity=None,
+        MaxMatches=None,
+    ):
+        return self.operator.call(
+            "SearchImageByNL",
+            StartPoint=StartPoint,
+            EndPoint=EndPoint,
+            RecordingToken=RecordingToken,
+            Text=Text,
+            Similarity=Similarity,
+            MaxMatches=MaxMatches,
+            KeepAliveTime=KeepAliveTime,
+        )
+
+    def GetNLSearchResults(
+        self, SearchToken, MinResults=None, MaxResults=None, WaitTime=None
+    ):
+        return self.operator.call(
+            "GetNLSearchResults",
+            SearchToken=SearchToken,
+            MinResults=MinResults,
+            MaxResults=MaxResults,
+            WaitTime=WaitTime,
+        )
+
+    def SearchImageByImage(
+        self,
+        StartPoint,
+        KeepAliveTime,
+        EndPoint=None,
+        RecordingToken=None,
+        TargetImageURI=None,
+        TargetImageData=None,
+        MaxMatches=None,
+    ):
+        return self.operator.call(
+            "SearchImageByImage",
+            StartPoint=StartPoint,
+            EndPoint=EndPoint,
+            RecordingToken=RecordingToken,
+            TargetImageURI=TargetImageURI,
+            TargetImageData=TargetImageData,
+            MaxMatches=MaxMatches,
+            KeepAliveTime=KeepAliveTime,
+        )
+
+    def GetImageSearchResults(
+        self, SearchToken, MinResults=None, MaxResults=None, WaitTime=None
+    ):
+        return self.operator.call(
+            "GetImageSearchResults",
+            SearchToken=SearchToken,
+            MinResults=MinResults,
+            MaxResults=MaxResults,
+            WaitTime=WaitTime,
+        )
