@@ -131,16 +131,20 @@ class ONVIFService:
 
         Example:
             device = client.devicemgmt()
-            
+
             info = device.GetDeviceInformation()
             info_dict = device.to_dict(info)
             print(info_dict)
-            
+
             profiles = media.GetProfiles()
             profiles_dict = device.to_dict(profiles)
         """
         try:
-            return {} if zeep_object is None else zeep.helpers.serialize_object(zeep_object)
+            return (
+                {}
+                if zeep_object is None
+                else zeep.helpers.serialize_object(zeep_object)
+            )
         except Exception as e:
             logger.error(f"Failed to convert zeep object to dict: {e}")
             return {}
