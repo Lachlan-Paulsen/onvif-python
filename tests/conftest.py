@@ -58,20 +58,21 @@ def mock_services():
 def mock_onvif_client():
     """Create a mocked ONVIF client for testing"""
     with patch("onvif.client.Device") as mock_device_class:
-        # Mock the Device class to avoid real network calls
         mock_device = Mock()
         mock_device_class.return_value = mock_device
 
-        client = ONVIFClient(
-            host="192.168.1.17",
-            port=8000,
-            username="admin",
-            password="admin123",
-            timeout=5,
-            cache=CacheMode.NONE,  # Disable caching for tests
-        )
+        # Configure GetServices BEFORE creating ONVIFClient
+        service1 = Mock()
+        service1.Namespace = "http://www.onvif.org/ver10/media/wsdl"
+        service1.XAddr = "http://192.168.1.17:8000/onvif/Media"
 
-        # Set up mock responses
+        service2 = Mock()
+        service2.Namespace = "http://www.onvif.org/ver20/ptz/wsdl"
+        service2.XAddr = "http://192.168.1.17:8000/onvif/PTZ"
+
+        mock_device.GetServices.return_value = [service1, service2]
+
+        # Configure other responses BEFORE creating client
         mock_device.GetDeviceInformation.return_value = Mock(
             Manufacturer="Test Manufacturer",
             Model="Test Model",
@@ -80,7 +81,6 @@ def mock_onvif_client():
             HardwareId="TEST_HW_001",
         )
 
-        # Create mock capabilities
         mock_caps = Mock()
         mock_caps.Media = Mock()
         mock_caps.Media.XAddr = "http://192.168.1.17:8000/onvif/Media"
@@ -89,18 +89,20 @@ def mock_onvif_client():
         mock_caps.Extension = Mock()
         mock_caps.Extension.DeviceIO = Mock()
         mock_caps.Extension.DeviceIO.XAddr = "http://192.168.1.17:8000/onvif/DeviceIO"
+
         mock_device.GetCapabilities.return_value = mock_caps
 
-        # Create mock services
-        service1 = Mock()
-        service1.Namespace = "http://www.onvif.org/ver10/media/wsdl"
-        service1.XAddr = "http://192.168.1.17:8000/onvif/Media"
-        service2 = Mock()
-        service2.Namespace = "http://www.onvif.org/ver20/ptz/wsdl"
-        service2.XAddr = "http://192.168.1.17:8000/onvif/PTZ"
-        mock_device.GetServices.return_value = [service1, service2]
+        client = ONVIFClient(
+            host="192.168.1.17",
+            port=8000,
+            username="admin",
+            password="admin123",
+            timeout=5,
+            cache=CacheMode.NONE,
+        )
 
         client._devicemgmt = mock_device
+
         yield client
 
 
