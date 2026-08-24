@@ -3,7 +3,7 @@
 <div align="center">
 <a href="https://app.codacy.com/gh/nirsimetri/onvif-python/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade"><img src="https://app.codacy.com/project/badge/Grade/bff08a94e4d447b690cea49c6594826d"/></a>
 <a href="https://deepwiki.com/nirsimetri/onvif-python"><img alt="Ask DeepWiki" src="https://deepwiki.com/badge.svg"></a>
-<a href="https://pypi.org/project/onvif-python/"><img alt="PyPI Version" src="https://img.shields.io/badge/PyPI-0.2.10-orange?logo=archive&color=yellow"></a>
+<a href="https://pypi.org/project/onvif-python/"><img alt="PyPI Version" src="https://img.shields.io/badge/PyPI-0.2.11-orange?logo=archive&color=yellow"></a>
 <a href="https://pepy.tech/projects/onvif-python"><img alt="Pepy Total Downloads" src="https://img.shields.io/pepy/dt/onvif-python?label=Downloads&color=red"></a>
 <br>
 <a href="https://github.com/nirsimetri/onvif-python/actions/workflows/python-app.yml"><img alt="Build" src="https://github.com/nirsimetri/onvif-python/actions/workflows/python-app.yml/badge.svg?branch=main"></a>
@@ -78,6 +78,9 @@ from onvif import ONVIFDiscovery
 
 # Buat instance discovery
 discovery = ONVIFDiscovery(timeout=5)
+
+# atau dengan interface yang berbeda
+discovery = ONVIFDiscovery(timeout=5, interface="192.168.1.69")
 
 # Temukan perangkat
 devices = discovery.discover()
@@ -314,12 +317,13 @@ Pustaka ini menyertakan antarmuka baris perintah (CLI) yang kuat untuk berintera
 <summary><b>1. CLI Langsung</b></summary> 
 
 ```bash
-usage: onvif [-h] [--host HOST] [--port PORT] [--username USERNAME] [--password PASSWORD] [--discover] [--filter FILTER] [--search SEARCH] [--page PAGE]
-             [--per-page PER_PAGE] [--timeout TIMEOUT] [--https] [--no-verify] [--no-patch] [--interactive] [--debug] [--wsdl WSDL]
+usage: onvif [-h] [--host HOST] [--port PORT] [--username USERNAME] [--password PASSWORD] [--discover]
+             [--filter FILTER] [--interface INTERFACE] [--search SEARCH] [--page PAGE] [--per-page PER_PAGE]
+             [--timeout TIMEOUT] [--https] [--no-verify] [--no-patch] [--interactive] [--debug] [--wsdl WSDL]
              [--cache {all,db,mem,none}] [--health-check-interval HEALTH_CHECK_INTERVAL] [--output OUTPUT] [--version]
              [service] [method] [params ...]
 
-ONVIF Terminal Client — v0.2.10
+ONVIF Terminal Client — v0.2.11
 https://github.com/nirsimetri/onvif-python
 
 positional arguments:
@@ -338,6 +342,8 @@ options:
   --discover, -d        Discover ONVIF devices on the network using WS-Discovery
   --filter FILTER, -f FILTER
                         Filter discovered devices by types or scopes (case-insensitive substring match)
+  --interface INTERFACE, -if INTERFACE
+                        Specify network interface IP for discovery (default: auto-detect)
   --search SEARCH, -s SEARCH
                         Search ONVIF products database by model or company (e.g., 'c210', 'hikvision')
   --page PAGE           Page number for search results (default: 1)
@@ -350,12 +356,13 @@ options:
   --debug               Enable debug mode with XML capture
   --wsdl WSDL           Custom WSDL directory path
   --cache {all,db,mem,none}
-                        Caching mode for ONVIFClient (default: all). 'all': memory+disk, 'db': disk-only, 'mem': memory-only, 'none': disabled.
+                        Caching mode for ONVIFClient (default: all). 'all': memory+disk, 'db': disk-only, 'mem':
+                        memory-only, 'none': disabled.
   --health-check-interval HEALTH_CHECK_INTERVAL, -hci HEALTH_CHECK_INTERVAL
                         Health check interval in seconds for interactive mode (default: 10)
   --output OUTPUT, -o OUTPUT
-                        Save command output to file. Supports .json, .xml extensions for format detection, or plain text. XML format automatically enables
-                        debug mode for SOAP capture.
+                        Save command output to file. Supports .json, .xml extensions for format detection, or plain
+                        text. XML format automatically enables debug mode for SOAP capture.
   --version, -v         Show ONVIF CLI version and exit
 
 Examples:
@@ -401,14 +408,14 @@ Examples:
 
 
 ```bash
-ONVIF Interactive Shell — v0.2.10
+ONVIF Interactive Shell — v0.2.11
 https://github.com/nirsimetri/onvif-python
 
 Basic Commands:
   capabilities, caps       - Show device capabilities
   services                 - Show available services with details
   info                     - Show connection and device information
-  exit, quit               - Exit the shell
+  exit                     - Exit the shell
   shortcuts                - Show available shortcuts
 
 Navigation Commands:
