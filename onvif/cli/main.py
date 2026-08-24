@@ -90,6 +90,11 @@ Examples:
         "-f",
         help="Filter discovered devices by types or scopes (case-insensitive substring match)",
     )
+    parser.add_argument(
+        "--interface",
+        "-if",
+        help="Specify network interface IP for discovery (default: auto-detect)",
+    )
 
     # Product search
     parser.add_argument(
@@ -226,7 +231,10 @@ def main():
 
         # Discover devices (pass --https flag to prioritize HTTPS XAddrs and filter term)
         devices = discover_devices(
-            timeout=4, prefer_https=args.https, filter_term=args.filter
+            timeout=4,
+            interface=args.interface if args.interface else None,
+            prefer_https=args.https,
+            filter_term=args.filter,
         )
 
         if not devices:
@@ -552,12 +560,16 @@ def _serialize_for_json(obj: Any) -> Any:
 
 
 def discover_devices(
-    timeout: int = 4, prefer_https: bool = False, filter_term: str | None = None
+    timeout: int = 4,
+    interface: str | None = None,
+    prefer_https: bool = False,
+    filter_term: str | None = None,
 ) -> list:
     """Discover ONVIF devices on the network using WS-Discovery.
 
     Args:
         timeout: Discovery timeout in seconds
+        interface: Network interface to use for discovery
         prefer_https: If True, prioritize HTTPS XAddrs when available
         filter_term: Optional search term to filter devices by types or scopes
 
@@ -566,7 +578,7 @@ def discover_devices(
     """
 
     # Use ONVIFDiscovery class
-    discovery = ONVIFDiscovery(timeout=timeout)
+    discovery = ONVIFDiscovery(timeout=timeout, interface=interface)
 
     print(f"\n{colorize('Discovering ONVIF devices on network...', 'yellow')}")
     print(f"Network interface: {colorize(discovery.get_local_ip(), 'white')}")
