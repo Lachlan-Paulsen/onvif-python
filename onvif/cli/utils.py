@@ -1,12 +1,16 @@
-# onvif/cli/utils.py
+"""Utility functions for ONVIF CLI tools."""
 
+from __future__ import annotations
+
+import ctypes
+import inspect
 import json
 import os
-import inspect
-from typing import Any, Dict, Optional
-from lxml import etree
 import re
+from ctypes import wintypes
+from typing import Any
 
+from lxml import etree
 
 # ONVIF namespace to service name mapping (used globally)
 # Format: namespace -> list of (service_name, binding_pattern)
@@ -78,7 +82,7 @@ def _is_valid_json(s: str) -> bool:
     return True
 
 
-def parse_json_params(params_str: str) -> Dict[str, Any]:
+def parse_json_params(params_str: str) -> dict[str, Any]:
     """Parse parameters from a JSON string or key=value pairs into a dict.
     Supports:
       - JSON: '{"a": 1, "b": 2}'
@@ -99,8 +103,8 @@ def parse_json_params(params_str: str) -> Dict[str, Any]:
     # quotes or brackets.
 
     def split_top_level(s: str):
-        tokens = []
-        buf = []
+        tokens: list[str] = []
+        buf: list[str] = []
         depth = 0
         in_single = False
         in_double = False
@@ -134,8 +138,8 @@ def parse_json_params(params_str: str) -> Dict[str, Any]:
 
         return tokens
 
-    params = {}
-    tokens = split_top_level(params_str)
+    params: dict[str, Any] = {}
+    tokens: list[str] = split_top_level(params_str)
 
     for pair in tokens:
         if "=" in pair:
@@ -146,7 +150,7 @@ def parse_json_params(params_str: str) -> Dict[str, Any]:
             # Try to parse the RHS as JSON first (to support nested objects/arrays)
             try:
                 v = json.loads(v_raw)
-            except Exception:
+            except (AttributeError, ValueError, TypeError):
                 # If it fails, it might be a quoted JSON string. Try unquoting it once.
                 v_token = v_raw
                 if (v_token.startswith("'") and v_token.endswith("'")) or (
@@ -157,7 +161,7 @@ def parse_json_params(params_str: str) -> Dict[str, Any]:
                 # Try parsing as JSON again
                 try:
                     v = json.loads(v_token)
-                except Exception:
+                except (AttributeError, ValueError, TypeError):
                     # If it still fails, the shell might have stripped quotes from keys.
                     # Let's try to fix it by adding quotes around keys.
                     try:
@@ -166,7 +170,7 @@ def parse_json_params(params_str: str) -> Dict[str, Any]:
                             r"([{\s,])([a-zA-Z0-9_]+)\s*:", r'\1"\2":', v_token
                         )
                         v = json.loads(fixed_json_str)
-                    except Exception:
+                    except (AttributeError, ValueError, TypeError):
                         # If it's still not JSON, fall back to simple type interpretation
                         if isinstance(v_token, str) and v_token.lower() == "true":
                             v = True
@@ -184,7 +188,7 @@ def parse_json_params(params_str: str) -> Dict[str, Any]:
                                     v = float(v_token)
                                 else:
                                     v = int(v_token)
-                            except Exception:
+                            except (AttributeError, ValueError, TypeError):
                                 v = v_token  # It's just a string
 
             params[key] = v
@@ -192,7 +196,7 @@ def parse_json_params(params_str: str) -> Dict[str, Any]:
     return params
 
 
-def get_service_required_args(service_name: str) -> Optional[list]:
+def get_service_required_args(service_name: str) -> list[str] | None:
     """
     Get required arguments for services that need them.
     Returns list of required argument names, or None if service doesn't need args.
@@ -219,21 +223,24 @@ def get_service_methods(service_obj) -> list:
     """Get list of available methods for a service"""
     methods = []
     for attr_name in dir(service_obj):
-        if not attr_name.startswith("_") and callable(getattr(service_obj, attr_name)):
+        if (
+            not attr_name.startswith("_")
+            and callable(getattr(service_obj, attr_name))
+            and attr_name not in ["type", "desc", "operations", "to_dict"]
+        ):
             # Skip helper methods
-            if attr_name not in ["type", "desc", "operations", "to_dict"]:
-                methods.append(attr_name)
+            methods.append(attr_name)
     return sorted(methods)
 
 
-def get_method_documentation(service_obj, method_name: str) -> Optional[Dict[str, Any]]:
+def get_method_documentation(service_obj, method_name: str) -> dict[str, Any] | None:
     """
     Extracts documentation from WSDL and parameters from the Python method signature.
     Returns a dictionary with 'doc', 'required', and 'optional' keys.
     """
     doc_text = "No documentation available."
-    required_args = []
-    optional_args = []
+    required_args: list[str] = []
+    optional_args: list[str] = []
 
     try:
         # 1. Get documentation from WSDL (existing logic)
@@ -336,7 +343,7 @@ def get_method_documentation(service_obj, method_name: str) -> Optional[Dict[str
 
         return {"doc": doc_text, "required": required_args, "optional": optional_args}
 
-    except (etree.ParseError, FileNotFoundError, AttributeError, ValueError):
+    except (etree.ParseError, FileNotFoundError, AttributeError, ValueError, OSError):
         # Fallback in case of any error, still try to get params
         try:
             # Use object.__getattribute__ to bypass ONVIFService wrapper and get original method
@@ -355,7 +362,7 @@ def get_method_documentation(service_obj, method_name: str) -> Optional[Dict[str
             }
         except (AttributeError, ValueError):
             return None
-    except Exception:
+    except RuntimeError:
         return None
 
 
@@ -366,9 +373,6 @@ def colorize(text: str, color: str) -> str:
         colorize._colors_enabled = True
         if os.name == "nt":  # Windows
             try:
-                import ctypes
-                from ctypes import wintypes
-
                 # Enable ANSI escape sequences
                 kernel32 = ctypes.windll.kernel32
                 h_stdout = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
@@ -552,7 +556,7 @@ def get_device_available_services(client) -> list:
             if namespace and namespace in ONVIF_NAMESPACE_MAP:
                 # Get all service names for this namespace (handles multi-binding)
                 service_mappings = ONVIF_NAMESPACE_MAP[namespace]
-                for service_name, binding in service_mappings:
+                for service_name, _ in service_mappings:
                     if service_name not in available_services:
                         available_services.append(service_name)
 
@@ -731,7 +735,7 @@ def get_device_available_services(client) -> list:
         if client._jwt_available:
             available_services.append("jwt")
 
-    return sorted(list(set(available_services)))  # Remove duplicates and sort
+    return sorted(set(available_services))  # Remove duplicates and sort
 
 
 def clean_documentation_html(doc_text: str) -> str:
@@ -744,7 +748,6 @@ def clean_documentation_html(doc_text: str) -> str:
     Returns:
         Cleaned text with HTML tags removed and links converted
     """
-    import re
 
     if not doc_text:
         return doc_text
@@ -806,9 +809,7 @@ def extract_documentation_text(doc_elem) -> str:
     return "".join(parts)
 
 
-def get_operation_type_info(
-    service_obj, operation_name: str
-) -> Optional[Dict[str, Any]]:
+def get_operation_type_info(service_obj, operation_name: str) -> dict[str, Any] | None:
     """
     Extract input and output message types from WSDL for a given operation.
     Returns a dictionary with 'input' and 'output' keys containing message details.
@@ -849,7 +850,7 @@ def get_operation_type_info(
         if operation is None:
             return None
 
-        result = {"input": None, "output": None}
+        result: dict[str, dict[str, Any] | None] = {"input": None, "output": None}
 
         # Get input message
         input_elem = operation.find("wsdl:input", namespaces)
@@ -875,7 +876,7 @@ def get_operation_type_info(
 
         return result
 
-    except Exception:
+    except (OSError, etree.XMLSyntaxError):
         return None
 
 
@@ -969,7 +970,7 @@ def _load_imported_schemas(root, schema_context: dict, namespaces: dict):
 
 def parse_message_from_wsdl(
     root, message_name: str, namespaces: dict, schema_context: dict
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Parse a WSDL message definition to extract parameter details.
     Returns a dictionary with message name and parameters.
@@ -1019,7 +1020,7 @@ def resolve_element_type(
     namespaces: dict,
     schema_context: dict,
     depth: int = 0,
-    visited: set = None,
+    visited: set[str] | None = None,
 ) -> list:
     """
     Resolve an element definition from the schema to get its parameters recursively.
@@ -1042,7 +1043,7 @@ def resolve_element_type(
         return []
 
     visited.add(element_name)
-    parameters = []
+    parameters: list[dict[str, Any]] = []
 
     # Search for element in all loaded schemas
     element = None
@@ -1182,7 +1183,7 @@ def resolve_complex_type(
     namespaces: dict,
     schema_context: dict,
     depth: int = 0,
-    visited: set = None,
+    visited: set[str] | None = None,
 ) -> list:
     """
     Resolve a complexType definition to get its child elements.
@@ -1205,7 +1206,8 @@ def resolve_complex_type(
         return []
 
     visited.add(type_name)
-    children = []
+    children: list[dict[str, Any]] = []
+    sequence = None
 
     # Search for complexType definition in all schemas
     complex_type = None
@@ -1371,7 +1373,7 @@ def parse_inline_complex_type(
     namespaces: dict,
     schema_context: dict,
     depth: int = 0,
-    visited: set = None,
+    visited: set[str] | None = None,
 ) -> list:
     """
     Parse an inline complexType element (not referenced by name).
@@ -1394,6 +1396,7 @@ def parse_inline_complex_type(
         return []
 
     children = []
+    sequence = None
 
     # First, get attributes (xs:attribute)
     for attr in complex_type.findall("xs:attribute", namespaces):

@@ -1,7 +1,9 @@
 # tests/test_error_handlers.py
 
-import pytest
 from unittest.mock import Mock
+
+import pytest
+
 from onvif.utils.error_handlers import ONVIFErrorHandler
 from onvif.utils.exceptions import ONVIFOperationException
 

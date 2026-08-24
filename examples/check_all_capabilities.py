@@ -8,7 +8,7 @@ This script connects to an ONVIF-compliant device and retrieves its
 capabilities using the Core (Device Management) service.
 """
 
-from onvif import ONVIFClient, CacheMode
+from onvif import CacheMode, ONVIFClient
 
 HOST = "192.168.1.3"
 PORT = 80

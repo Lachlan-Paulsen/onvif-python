@@ -1,5 +1,6 @@
-from onvif.services import PausableSubscription
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import PausableSubscription
 
 
 class TestPausableSubscriptionWSDLCompliance(ONVIFServiceTestBase):

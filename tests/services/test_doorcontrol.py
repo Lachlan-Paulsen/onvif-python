@@ -1,5 +1,6 @@
-from onvif.services import DoorControl
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import DoorControl
 
 
 class TestDoorControlWSDLCompliance(ONVIFServiceTestBase):

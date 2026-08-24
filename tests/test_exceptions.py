@@ -1,7 +1,8 @@
 # tests/test_exceptions.py
 
-import pytest
 from unittest.mock import Mock
+
+import pytest
 
 # Import from onvif main package to match actual structure
 from onvif.utils.exceptions import ONVIFOperationException

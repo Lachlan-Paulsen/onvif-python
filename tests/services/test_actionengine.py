@@ -1,5 +1,6 @@
-from onvif.services import ActionEngine
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import ActionEngine
 
 
 class TestActionEngineWSDLCompliance(ONVIFServiceTestBase):

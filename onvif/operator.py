@@ -1,13 +1,15 @@
-# onvif/operator.py
+"""ONVIFOperator: Low-level ONVIF service operator using Zeep SOAP client."""
 
+from __future__ import annotations
+
+import logging
 import os
 import warnings
-import logging
+from enum import Enum
+
 import requests
 import urllib3
-
-from enum import Enum
-from zeep import Settings, Transport, Client, CachingClient
+from zeep import CachingClient, Client, Settings, Transport
 from zeep.cache import SqliteCache
 from zeep.exceptions import Fault
 from zeep.wsse.username import UsernameToken
@@ -80,20 +82,22 @@ class ONVIFOperator:
         wsdl_path: str,
         host: str,
         port: int,
-        username: str = None,
-        password: str = None,
+        username: str,
+        password: str,
         timeout: int = 10,
-        binding: str = None,
-        service_path: str = None,
-        xaddr: str = None,
+        binding: str | None = None,
+        service_path: str | None = None,
+        xaddr: str | None = None,
         cache: CacheMode = CacheMode.ALL,  # all | db | mem | none
-        cache_path: str = None,
+        cache_path: str | None = None,
         use_https: bool = False,
         verify_ssl: bool = True,
         apply_patch: bool = True,
-        plugins: list = None,
+        plugins: list | None = None,
     ):
-        logger.debug(f"Creating ONVIFOperator for {host}:{port} with WSDL: {wsdl_path}")
+        logger.debug(
+            "Creating ONVIFOperator for %s:%d with WSDL: %s", host, port, wsdl_path
+        )
 
         self.wsdl_path = wsdl_path
         self.host = host
@@ -110,7 +114,7 @@ class ONVIFOperator:
             path = service_path or "device_service"  # default fallback
             self.address = f"{protocol}://{host}:{port}/onvif/{path}"
 
-        logger.debug(f"Service endpoint: {self.address}")
+        logger.debug("Service endpoint: %s", self.address)
 
         # Session reuse with retry strategy
         session = requests.Session()
@@ -129,7 +133,7 @@ class ONVIFOperator:
                 os.makedirs(user_cache_dir, exist_ok=True)
                 cache_path = os.path.join(user_cache_dir, "onvif_zeep_cache.sqlite")
 
-            logger.debug(f"Using SQLite cache: {cache_path}")
+            logger.debug("Using SQLite cache: %s", cache_path)
             transport_kwargs["cache"] = SqliteCache(path=cache_path)
 
         transport = Transport(**transport_kwargs)
@@ -142,18 +146,16 @@ class ONVIFOperator:
             else None
         )
 
-        if cache == CacheMode.ALL:
+        ClientType: type[Client | CachingClient]  # pylint: disable=invalid-name
+
+        if cache == CacheMode.ALL or cache == CacheMode.MEM:
             ClientType = CachingClient
-        elif cache == CacheMode.MEM:
-            ClientType = CachingClient
-        elif cache == CacheMode.DB:
-            ClientType = Client
-        elif cache == CacheMode.NONE:
+        elif cache == CacheMode.DB or cache == CacheMode.NONE:
             ClientType = Client
         else:
             raise ValueError(f"Unknown cache option: {cache}")
 
-        logger.debug(f"Using cache mode: {cache.value}")
+        logger.debug("Using cache mode: %s", cache.value)
 
         self.client = ClientType(
             wsdl=self.wsdl_path,
@@ -170,7 +172,7 @@ class ONVIFOperator:
         self.service_name = binding.split("}")[-1].replace(
             "Binding", ""
         )  # Store cleaned service name for logging context
-        logger.info(f"ONVIFOperator initialized {binding} at {self.address}")
+        logger.info("ONVIFOperator initialized %s at %s", binding, self.address)
 
     def call(self, method: str, *args, **kwargs):
         """Call an ONVIF service operation.
@@ -190,16 +192,16 @@ class ONVIFOperator:
         Raises:
             ONVIFOperationException: If the operation fails (wraps original exception)
         """
-        logger.debug(f"Calling ONVIF method: {self.service_name}.{method}")
+        logger.debug("Calling ONVIF method: %s.%s", self.service_name, method)
 
         try:
             func = getattr(self.service, method)
         except AttributeError as e:
-            raise ONVIFOperationException(operation=method, original_exception=e)
+            raise ONVIFOperationException(operation=method, original_exception=e) from e
 
         try:
             result = func(*args, **kwargs)
-            logger.debug(f"ONVIF call {self.service_name}.{method} succeeded")
+            logger.debug("ONVIF call %s.%s succeeded", self.service_name, method)
 
             # Post-process to flatten xsd:any fields if enabled (> v0.0.4 patch)
             if self.apply_patch:
@@ -207,9 +209,9 @@ class ONVIFOperator:
             return result
 
         except Fault as e:
-            raise ONVIFOperationException(operation=method, original_exception=e)
+            raise ONVIFOperationException(operation=method, original_exception=e) from e
         except Exception as e:
-            raise ONVIFOperationException(operation=method, original_exception=e)
+            raise ONVIFOperationException(operation=method, original_exception=e) from e
 
     def create_type(self, type_name: str):
         """
@@ -227,7 +229,7 @@ class ONVIFOperator:
         Raises:
             AttributeError: If type not found in WSDL schema
         """
-        logger.debug(f"Creating type instance for: {type_name}")
+        logger.debug("Creating type instance for: %s", type_name)
 
         # Method 1: Try to get element from WSDL (works for operation parameters)
         # Common namespace prefixes for ONVIF services
@@ -242,12 +244,12 @@ class ONVIFOperator:
                 element = self.client.get_element(f"{ns}:{type_name}")
                 instance = element()
                 logger.debug(
-                    f"Successfully created type {type_name} using namespace {ns}"
+                    "Successfully created type %s using namespace %s", type_name, ns
                 )
                 return self._initialize_nested_types(instance)
-            except Exception as e:
+            except (AttributeError, TypeError, ValueError) as e:
                 logger.debug(
-                    f"Failed to create type {type_name} with namespace {ns}: {e}"
+                    "Failed to create type %s with namespace %s: %s", type_name, ns, e
                 )
                 continue
 
@@ -255,10 +257,12 @@ class ONVIFOperator:
         try:
             element = self.client.get_element(type_name)
             instance = element()
-            logger.debug(f"Successfully created type {type_name} without namespace")
+            logger.debug("Successfully created type %s without namespace", type_name)
             return self._initialize_nested_types(instance)
-        except Exception as e:
-            logger.debug(f"Failed to create element {type_name} without namespace: {e}")
+        except (AttributeError, TypeError, ValueError) as e:
+            logger.debug(
+                "Failed to create element %s without namespace: %s", type_name, e
+            )
 
         # Method 3: Try to get type from schema (for complex types)
         try:
@@ -267,12 +271,17 @@ class ONVIFOperator:
                     type_obj = self.client.get_type(f"{ns}:{type_name}")
                     instance = type_obj()
                     logger.debug(
-                        f"Successfully created complex type {type_name} using namespace {ns}"
+                        "Successfully created complex type %s using namespace %s",
+                        type_name,
+                        ns,
                     )
                     return self._initialize_nested_types(instance)
-                except Exception as e:
+                except (AttributeError, TypeError, ValueError) as e:
                     logger.debug(
-                        f"Failed to create complex type {type_name} with namespace {ns}: {e}"
+                        "Failed to create complex type %s with namespace %s: %s",
+                        type_name,
+                        ns,
+                        e,
                     )
                     continue
 
@@ -280,16 +289,16 @@ class ONVIFOperator:
             type_obj = self.client.get_type(type_name)
             instance = type_obj()
             logger.debug(
-                f"Successfully created complex type {type_name} without namespace"
+                "Successfully created complex type %s without namespace", type_name
             )
             return self._initialize_nested_types(instance)
-        except Exception as e:
+        except (AttributeError, TypeError, ValueError) as e:
             logger.debug(
-                f"Failed to create complex type {type_name} without namespace: {e}"
+                "Failed to create complex type %s without namespace: %s", type_name, e
             )
 
         # If all methods fail, log the error and raise
-        logger.error(f"Type '{type_name}' not found in WSDL schema using any method")
+        logger.error("Type '%s' not found in WSDL schema using any method", type_name)
         raise AttributeError(f"Type '{type_name}' not found in WSDL schema.")
 
     def _initialize_nested_types(self, instance):
@@ -308,7 +317,9 @@ class ONVIFOperator:
         try:
             # Get the XSD type from the instance's class
             if hasattr(instance.__class__, "_xsd_type"):
-                xsd_type = instance.__class__._xsd_type
+                xsd_type = (
+                    instance.__class__._xsd_type  # pylint: disable=protected-access
+                )
 
                 # Iterate through elements defined in the XSD type
                 if hasattr(xsd_type, "elements"):
@@ -329,18 +340,21 @@ class ONVIFOperator:
                                     )
                                     setattr(instance, element_name, nested_instance)
                                     logger.debug(
-                                        f"Initialized nested type for element: {element_name}"
+                                        "Initialized nested type for element: %s",
+                                        element_name,
                                     )
-                                except Exception as e:
+                                except (AttributeError, TypeError, ValueError) as e:
                                     # Log specific nested type initialization failures
                                     logger.debug(
-                                        f"Failed to initialize nested type for {element_name}: {e}"
+                                        "Failed to initialize nested type for %s: %s",
+                                        element_name,
+                                        e,
                                     )
                                     # Continue with other elements instead of failing completely
                                     continue
-        except Exception as e:
+        except (AttributeError, TypeError, ValueError) as e:
             # Log the error but don't fail - the top-level object is still usable
-            logger.debug(f"Error during nested type initialization: {e}")
+            logger.debug("Error during nested type initialization: %s", e)
             # The important thing is that the top-level object is created
 
         return instance

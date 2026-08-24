@@ -7,10 +7,11 @@ This script scans a given subnet for ONVIF-compliant devices by checking common 
 It uses nmap for port scanning and sends a SOAP request to verify ONVIF compliance.
 """
 
+import argparse
+import json
+
 import nmap
 import requests
-import json
-import argparse
 
 
 def is_onvif(ip, port, timeout=3):

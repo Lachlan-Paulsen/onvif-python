@@ -1,5 +1,6 @@
-from onvif.services import PTZ
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import PTZ
 
 
 class TestPTZWSDLCompliance(ONVIFServiceTestBase):

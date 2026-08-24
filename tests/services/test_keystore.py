@@ -1,5 +1,6 @@
-from onvif.services import Keystore
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import Keystore
 
 
 class TestKeystoreWSDLCompliance(ONVIFServiceTestBase):

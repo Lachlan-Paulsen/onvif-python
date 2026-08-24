@@ -9,9 +9,10 @@ opens the video stream using OpenCV, and allows PTZ control via keyboard.
 PTZ movement stops automatically when no key is pressed.
 """
 
-import cv2
 import sys
 import urllib.parse
+
+import cv2
 
 from onvif import ONVIFClient
 

@@ -1,5 +1,6 @@
-from onvif.services import MediaSigning
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import MediaSigning
 
 
 class TestMediaSigningWSDLCompliance(ONVIFServiceTestBase):

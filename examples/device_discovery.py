@@ -10,6 +10,7 @@ Applied for (>= v0.1.6 patch)
 """
 
 import json
+
 from onvif import ONVIFDiscovery
 
 try:
