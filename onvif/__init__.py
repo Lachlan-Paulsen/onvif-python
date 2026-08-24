@@ -1,6 +1,10 @@
-# onvif/__init__.py
+"""onvif-python: A Python library for interacting with ONVIF-compliant devices."""
 
-__version__ = "0.2.10"
+from typing import Final
+
+
+__version__: Final[str] = "0.2.10"
+__repository__: Final[str] = "https://github.com/nirsimetri/onvif-python"
 
 from .cli import main as ONVIFCLI
 from .client import ONVIFClient
@@ -25,4 +29,5 @@ __all__ = [
     "ONVIFDiscovery",
     "ONVIFParser",
     "__version__",
+    "__repository__",
 ]
