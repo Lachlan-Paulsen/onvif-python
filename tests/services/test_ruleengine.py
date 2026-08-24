@@ -1,5 +1,6 @@
-from onvif.services import RuleEngine
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import RuleEngine
 
 
 class TestRuleEngineWSDLCompliance(ONVIFServiceTestBase):

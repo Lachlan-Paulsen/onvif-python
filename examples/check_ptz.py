@@ -8,6 +8,7 @@ This script checks basic PTZ functionality of an ONVIF-compliant device.
 """
 
 from time import sleep
+
 from onvif import ONVIFClient
 
 HOST = "192.168.1.3"

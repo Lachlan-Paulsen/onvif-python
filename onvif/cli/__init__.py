@@ -1,4 +1,4 @@
-# onvif/cli/__init__.py
+"""ONVIF CLI"""
 
 from .main import main
 

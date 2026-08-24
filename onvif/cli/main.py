@@ -1,29 +1,32 @@
-# onvif/cli/main.py
+"""ONVIF CLI main entry point."""
+
+from __future__ import annotations
 
 import argparse
-import sys
-import warnings
 import getpass
-import sqlite3
+import json
 import os
 import shutil
-import json
-from datetime import datetime
-from typing import Any, Optional, Tuple
+import sqlite3
+import sys
+import traceback as traceback_lib
+import warnings
+from datetime import datetime, timezone
+from typing import Any
 
-from .. import __version__
+from .. import __repository__, __version__
 from ..client import ONVIFClient
 from ..operator import CacheMode
-from ..utils.discovery import ONVIFDiscovery
+from ..utils import ONVIFOperationException, ONVIFDiscovery
 from .interactive import InteractiveShell
-from .utils import parse_json_params, colorize
+from .utils import colorize, parse_json_params
 
 
 def create_parser():
     """Create argument parser for ONVIF CLI"""
     parser = argparse.ArgumentParser(
         prog="onvif",
-        description=f"{colorize('ONVIF Terminal Client', 'yellow')} — v{__version__}\nhttps://github.com/nirsimetri/onvif-python",
+        description=f"{colorize('ONVIF Terminal Client', 'yellow')} — v{__version__}\n{__repository__}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
 Examples:
@@ -86,6 +89,11 @@ Examples:
         "--filter",
         "-f",
         help="Filter discovered devices by types or scopes (case-insensitive substring match)",
+    )
+    parser.add_argument(
+        "--interface",
+        "-if",
+        help="Specify network interface IP for discovery (default: auto-detect)",
     )
 
     # Product search
@@ -223,7 +231,10 @@ def main():
 
         # Discover devices (pass --https flag to prioritize HTTPS XAddrs and filter term)
         devices = discover_devices(
-            timeout=4, prefer_https=args.https, filter_term=args.filter
+            timeout=4,
+            interface=args.interface if args.interface else None,
+            prefer_https=args.https,
+            filter_term=args.filter,
         )
 
         if not devices:
@@ -243,7 +254,7 @@ def main():
             sys.exit(0)
 
         # Set host, port, and HTTPS from selected device
-        args.host, args.port, device_use_https = selected
+        args.host, args.port, _ = selected
 
         # Use device's detected protocol (already filtered by prefer_https in discover_devices)
         # No need to override - device info already has correct protocol based on --https flag
@@ -302,16 +313,14 @@ def main():
             try:
                 # Try to get device information to verify connection
                 client.devicemgmt().GetDeviceInformation()
-            except Exception as e:
+            except ONVIFOperationException as e:
                 print(
                     f"{colorize('Error:', 'red')} Unable to connect to ONVIF device at {colorize(f'{args.host}:{args.port}', 'white')}",
                     file=sys.stderr,
                 )
                 print(f"Connection error: {e}", file=sys.stderr)
                 if args.debug:
-                    import traceback
-
-                    traceback.print_exc()
+                    traceback_lib.print_exc()
                 sys.exit(1)
 
             # Start interactive shell
@@ -336,32 +345,33 @@ def main():
     except KeyboardInterrupt:
         print("\nOperation cancelled by user")
         sys.exit(1)
-    except Exception as e:
+    except RuntimeError as e:
         print(f"Error: {e}", file=sys.stderr)
         if args.debug:
-            import traceback
-
-            traceback.print_exc()
+            traceback_lib.print_exc()
         sys.exit(1)
 
 
 def execute_command(
-    client: ONVIFClient, service_name: str, method_name: str, params_str: str = None
+    client: ONVIFClient,
+    service_name: str,
+    method_name: str,
+    params_str: str | None = None,
 ) -> Any:
     """Execute a single ONVIF command"""
     # Get service instance
     try:
         service = getattr(client, service_name.lower())()
-    except AttributeError:
-        raise ValueError(f"{colorize('Unknown service:', 'red')} {service_name}")
+    except AttributeError as e:
+        raise ValueError(f"{colorize('Unknown service:', 'red')} {service_name}") from e
 
     # Get method
     try:
         method = getattr(service, method_name)
-    except AttributeError:
+    except AttributeError as e:
         raise ValueError(
             f"{colorize('Unknown method', 'red')} '{method_name}' for service '{service_name}'"
-        )
+        ) from e
 
     # Parse parameters
     params = parse_json_params(params_str) if params_str else {}
@@ -391,7 +401,7 @@ def save_output_to_file(
 
             # JSON format
             output_data["result"] = _serialize_for_json(result)
-            output_data["timestamp"] = datetime.now().isoformat()
+            output_data["timestamp"] = datetime.now(timezone.utc).isoformat()
             output_data["raw_result"] = str(result)  # Add raw string as fallback
 
             # Add XML data if debug mode is enabled and XML plugin is available
@@ -411,7 +421,7 @@ def save_output_to_file(
                 # Save the raw SOAP response XML with minimal wrapper
                 content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!-- ONVIF SOAP Response -->
-<!-- Timestamp: {datetime.now().isoformat()} -->
+<!-- Timestamp: {datetime.now(timezone.utc).isoformat()} -->
 <!-- Operation: {client.xml_plugin.last_operation or 'Unknown'} -->
 
 {client.xml_plugin.last_received_xml}
@@ -420,11 +430,11 @@ def save_output_to_file(
                 # Fallback: Simple XML wrapper for the parsed result
                 content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!-- ONVIF Command Output (Parsed Result) -->
-<!-- Timestamp: {datetime.now().isoformat()} -->
+<!-- Timestamp: {datetime.now(timezone.utc).isoformat()} -->
 <!-- Note: Raw SOAP XML not available. Enable --debug for full SOAP capture. -->
 <onvif_result>
 <![CDATA[
-{str(result)}
+{result!s}
 ]]>
 </onvif_result>
 """
@@ -435,7 +445,7 @@ def save_output_to_file(
         else:
             # Plain text format (default)
             content = "ONVIF Command Output\n"
-            content += f"Timestamp: {datetime.now().isoformat()}\n"
+            content += f"Timestamp: {datetime.now(timezone.utc).isoformat()}\n"
             content += f"{'='*50}\n\n"
             content += str(result)
 
@@ -456,7 +466,7 @@ def save_output_to_file(
             with open(output_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
-    except Exception as e:
+    except (AttributeError, ValueError, OSError) as e:
         print(f"{colorize('Error saving output:', 'red')} {e}", file=sys.stderr)
         # Still print the result to console if file save fails
         print(str(result))
@@ -486,8 +496,11 @@ def _serialize_for_json(obj: Any) -> Any:
     elif hasattr(obj, "_xsd_type"):
         result = {}
         # Try to get all elements from XSD type
-        if hasattr(obj._xsd_type, "elements"):
-            for elem_name, elem_obj in obj._xsd_type.elements:
+        if hasattr(obj._xsd_type, "elements"):  # pylint: disable=protected-access
+            for (
+                elem_name,
+                _,
+            ) in obj._xsd_type.elements:  # pylint: disable=protected-access
                 try:
                     value = getattr(obj, elem_name, None)
                     if value is not None:
@@ -535,7 +548,7 @@ def _serialize_for_json(obj: Any) -> Any:
         return result
     elif hasattr(obj, "_value_1"):
         # Handle zeep objects with special structure
-        return _serialize_for_json(obj._value_1)
+        return _serialize_for_json(obj._value_1)  # pylint: disable=protected-access
     else:
         # Try to convert to dict using vars() if available
         try:
@@ -547,12 +560,16 @@ def _serialize_for_json(obj: Any) -> Any:
 
 
 def discover_devices(
-    timeout: int = 4, prefer_https: bool = False, filter_term: Optional[str] = None
+    timeout: int = 4,
+    interface: str | None = None,
+    prefer_https: bool = False,
+    filter_term: str | None = None,
 ) -> list:
     """Discover ONVIF devices on the network using WS-Discovery.
 
     Args:
         timeout: Discovery timeout in seconds
+        interface: Network interface to use for discovery
         prefer_https: If True, prioritize HTTPS XAddrs when available
         filter_term: Optional search term to filter devices by types or scopes
 
@@ -561,10 +578,10 @@ def discover_devices(
     """
 
     # Use ONVIFDiscovery class
-    discovery = ONVIFDiscovery(timeout=timeout)
+    discovery = ONVIFDiscovery(timeout=timeout, interface=interface)
 
     print(f"\n{colorize('Discovering ONVIF devices on network...', 'yellow')}")
-    print(f"Network interface: {colorize(discovery._get_local_ip(), 'white')}")
+    print(f"Network interface: {colorize(discovery.get_local_ip(), 'white')}")
     print(f"Timeout: {timeout}s")
     if filter_term:
         print(f"Filter: {colorize(filter_term, 'yellow')}")
@@ -575,7 +592,7 @@ def discover_devices(
     return devices
 
 
-def select_device_interactive(devices: list) -> Optional[Tuple[str, int, bool]]:
+def select_device_interactive(devices: list) -> tuple[str, int, bool] | None:
     """Display devices and allow user to select one interactively.
 
     Returns:
@@ -776,7 +793,7 @@ def search_products(search_term: str, page: int = 1, per_page: int = 20) -> None
         # Get terminal width for adaptive formatting
         try:
             terminal_width = shutil.get_terminal_size().columns
-        except Exception:
+        except (AttributeError, ValueError, OSError):
             terminal_width = 120  # fallback width
 
         # Calculate minimum column widths
@@ -790,7 +807,7 @@ def search_products(search_term: str, page: int = 1, per_page: int = 20) -> None
                     if i == 1:  # Date column - calculate formatted date width
                         str_value = str(value)
                         if "T" in str_value:
-                            date_part = str_value.split("T")[0]
+                            date_part = str_value.split("T", maxsplit=1)[0]
                             time_part = str_value.split("T")[1].split(".")[0]
                             if "+" in time_part:
                                 time_part = time_part.split("+")[0]
@@ -869,7 +886,7 @@ def search_products(search_term: str, page: int = 1, per_page: int = 20) -> None
                             if "T" in str_value:
                                 # Parse ISO format: 2024-08-15T17:53:12.9154121+08:00
                                 # Extract just the date and time part before timezone
-                                date_part = str_value.split("T")[0]
+                                date_part = str_value.split("T", maxsplit=1)[0]
                                 time_part = str_value.split("T")[1].split(".")[
                                     0
                                 ]  # Remove microseconds
@@ -889,7 +906,7 @@ def search_products(search_term: str, page: int = 1, per_page: int = 20) -> None
                                 try:
                                     parsed_date = datetime.strptime(
                                         str_value, "%Y-%m-%d %H:%M:%S"
-                                    )
+                                    ).astimezone()
                                     formatted_value = parsed_date.strftime(
                                         "%Y-%m-%d %H:%M:%S"
                                     )
@@ -897,7 +914,7 @@ def search_products(search_term: str, page: int = 1, per_page: int = 20) -> None
                                     try:
                                         parsed_date = datetime.strptime(
                                             str_value, "%Y-%m-%d"
-                                        )
+                                        ).astimezone()
                                         formatted_value = parsed_date.strftime(
                                             "%Y-%m-%d 00:00:00"
                                         )
@@ -905,7 +922,7 @@ def search_products(search_term: str, page: int = 1, per_page: int = 20) -> None
                                         formatted_value = (
                                             str_value  # Keep original if parsing fails
                                         )
-                        except Exception:
+                        except (KeyError, ValueError, IndexError):
                             formatted_value = str_value  # Keep original if any error
                     else:
                         # Apply truncation based on calculated column width
@@ -939,7 +956,7 @@ def search_products(search_term: str, page: int = 1, per_page: int = 20) -> None
     except sqlite3.Error as e:
         print(f"{colorize('Database error:', 'red')} {e}")
         sys.exit(1)
-    except Exception as e:
+    except (AttributeError, ValueError, OSError) as e:
         print(f"{colorize('Error:', 'red')} {e}")
         sys.exit(1)
 
@@ -947,7 +964,9 @@ def search_products(search_term: str, page: int = 1, per_page: int = 20) -> None
 def setup_warning_format():
     """Setup custom warning format to show clean, concise warnings"""
 
-    def custom_warning_format(message, category, filename, lineno, line=None):
+    def custom_warning_format(
+        message, category, filename, lineno, line=None
+    ):  # pylint: disable=unused-argument
         # Show only the warning message without file path and line number
         return f"{category.__name__}: {message}\n"
 

@@ -1,5 +1,6 @@
-from onvif.services import Recording
 from base_service_test import ONVIFServiceTestBase
+
+from onvif.services import Recording
 
 
 class TestRecordingWSDLCompliance(ONVIFServiceTestBase):
