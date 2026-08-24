@@ -1,10 +1,12 @@
-# onvif/utils/discovery.py
+"""ONVIFDiscovery: Discover ONVIF-compliant devices on the local network using WS-Discovery protocol."""
+
+from __future__ import annotations
 
 import logging
 import socket
 import struct
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar
 
 from lxml import etree
 
@@ -52,7 +54,7 @@ class ONVIFDiscovery:
         "</soap:Envelope>"
     )
 
-    NAMESPACES = {
+    NAMESPACES: ClassVar[dict[str, str]] = {
         "soap": "http://www.w3.org/2003/05/soap-envelope",
         "wsa": "http://schemas.xmlsoap.org/ws/2004/08/addressing",
         "wsd": "http://schemas.xmlsoap.org/ws/2005/04/discovery",
@@ -62,7 +64,7 @@ class ONVIFDiscovery:
     def __init__(
         self,
         timeout: int = 4,
-        interface: Optional[str] = None,
+        interface: str | None = None,
     ):
         """Initialize ONVIF Discovery.
 
@@ -72,13 +74,13 @@ class ONVIFDiscovery:
         """
         self.timeout = timeout
         self.interface = interface
-        self._local_ip = None
+        self._local_ip: str | None = None
 
-    def _get_local_ip(self) -> Optional[str]:
+    def get_local_ip(self) -> str:
         """Get local network interface IP address.
 
         Returns:
-            Optional[str]: Local IP address, or None to use default interface binding
+            str: Local IP address
         """
         if self._local_ip is not None:
             return self._local_ip
@@ -94,18 +96,18 @@ class ONVIFDiscovery:
             self._local_ip = s.getsockname()[0]
             s.close()
             return self._local_ip
-        except Exception as e:
-            logger.debug(f"Failed to get local IP via default route: {e}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.debug("Failed to get local IP via default route: %s", e)
             # Try alternative method to get local IP
             try:
                 hostname = socket.gethostname()
                 local_ip = socket.gethostbyname(hostname)
                 if local_ip and not local_ip.startswith("127."):
                     self._local_ip = local_ip
-                    logger.debug(f"Got local IP via hostname: {local_ip}")
+                    logger.debug("Got local IP via hostname: %s", local_ip)
                     return self._local_ip
-            except Exception as e:
-                logger.debug(f"Failed to get local IP via hostname: {e}")
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.debug("Failed to get local IP via hostname: %s", exc)
 
             # Return empty string instead of None for socket binding
             # Empty string lets OS choose the appropriate interface
@@ -115,8 +117,8 @@ class ONVIFDiscovery:
             return self._local_ip
 
     def discover(
-        self, prefer_https: bool = False, search: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, prefer_https: bool = False, search: str | None = None
+    ) -> list[dict[str, Any]]:
         """Discover ONVIF devices on the network.
 
         Args:
@@ -144,13 +146,13 @@ class ONVIFDiscovery:
             >>> devices = discovery.discover(search="ptz")
             >>> devices = discovery.discover(search="Hong Kong")
         """
-        local_ip = self._get_local_ip()
-        logger.info(f"Starting ONVIF device discovery (timeout: {self.timeout}s)")
-        logger.debug(f"Local IP: {local_ip or 'auto-detect'}")
+        local_ip = self.get_local_ip()
+        logger.info("Starting ONVIF device discovery (timeout: %ss)", self.timeout)
+        logger.debug("Local IP: %s", local_ip or "auto-detect")
         if prefer_https:
             logger.debug("Prefer HTTPS endpoints enabled")
         if search:
-            logger.debug(f"Search filter: {search}")
+            logger.debug("Search filter: %s", search)
 
         probe_uuid = str(uuid.uuid4())
         probe = self.WS_DISCOVERY_PROBE_MESSAGE.format(uuid=probe_uuid)
@@ -172,7 +174,9 @@ class ONVIFDiscovery:
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
 
             logger.debug(
-                f"Sending WS-Discovery probe to {self.WS_DISCOVERY_ADDRESS_IPv4}:{self.WS_DISCOVERY_PORT}"
+                "Sending WS-Discovery probe to %s:%s",
+                self.WS_DISCOVERY_ADDRESS_IPv4,
+                self.WS_DISCOVERY_PORT,
             )
             sock.sendto(
                 probe.encode("utf-8"),
@@ -184,27 +188,33 @@ class ONVIFDiscovery:
                     data, addr = sock.recvfrom(8192)
                     response = data.decode("utf-8", errors="ignore").strip()
 
-                    if response and len(response) > 10:
-                        if response.startswith("<?xml") or response.startswith("<"):
-                            logger.debug(f"Received response from {addr[0]}")
-                            responses.append({"xml": response, "address": addr[0]})
+                    if (
+                        response
+                        and len(response) > 10
+                        and response.startswith(("<?xml", "<"))
+                    ):
+                        logger.debug("Received response from %s", addr[0])
+                        responses.append({"xml": response, "address": addr[0]})
 
                 except socket.timeout:
                     logger.debug("Discovery timeout reached")
                     break
-                except Exception as e:
+                except Exception as exc:  # pylint: disable=broad-except
                     # Ignore individual packet errors and continue
-                    logger.debug(f"Error receiving packet: {e}")
+                    logger.debug(
+                        "Error receiving packet: %s",
+                        exc,
+                    )
                     continue
 
             sock.close()
 
-        except Exception as e:
+        except Exception as exc:  # pylint: disable=broad-except
             # Socket creation or binding failed
-            logger.error(f"Discovery failed: {e}")
+            logger.error("Discovery failed: %s", exc)
             return []
 
-        logger.info(f"Received {len(responses)} responses")
+        logger.info("Received %s responses", len(responses))
 
         # Parse responses
         devices = self._parse_responses(responses, prefer_https)
@@ -214,15 +224,18 @@ class ONVIFDiscovery:
             unfiltered_count = len(devices)
             devices = self._filter_devices(devices, search)
             logger.info(
-                f"Search filter '{search}' matched {len(devices)}/{unfiltered_count} devices"
+                "Search filter '%s' matched %s/%s devices",
+                search,
+                len(devices),
+                unfiltered_count,
             )
 
-        logger.info(f"Discovery completed: found {len(devices)} ONVIF devices")
+        logger.info("Discovery completed: found %s ONVIF devices", len(devices))
         return devices
 
     def _parse_responses(
-        self, responses: List[Dict[str, str]], prefer_https: bool = False
-    ) -> List[Dict[str, Any]]:
+        self, responses: list[dict[str, str]], prefer_https: bool = False
+    ) -> list[dict[str, Any]]:
         """Parse WS-Discovery responses into device information.
 
         Args:
@@ -232,7 +245,7 @@ class ONVIFDiscovery:
         Returns:
             List of parsed device information
         """
-        logger.debug(f"Parsing {len(responses)} WS-Discovery responses")
+        logger.debug("Parsing %s WS-Discovery responses", len(responses))
         devices = []
 
         for resp in responses:
@@ -241,19 +254,19 @@ class ONVIFDiscovery:
                 if device_info and device_info.get("host"):
                     devices.append(device_info)
                     logger.debug(
-                        f"Parsed device: {device_info['host']}:{device_info['port']}"
+                        "Parsed device: %s:%s", device_info["host"], device_info["port"]
                     )
-            except Exception as e:
+            except (KeyError, TypeError, ValueError) as e:
                 # Skip malformed responses
-                logger.debug(f"Failed to parse response: {e}")
+                logger.debug("Failed to parse response: %s", e)
                 continue
 
-        logger.debug(f"Successfully parsed {len(devices)} valid devices")
+        logger.debug("Successfully parsed %s valid devices", len(devices))
         return devices
 
     def _filter_devices(
-        self, devices: List[Dict[str, Any]], search_term: str
-    ) -> List[Dict[str, Any]]:
+        self, devices: list[dict[str, Any]], search_term: str
+    ) -> list[dict[str, Any]]:
         """Filter devices based on search term in types or scopes.
 
         Args:
@@ -288,7 +301,7 @@ class ONVIFDiscovery:
 
     def _parse_single_response(
         self, xml_data: str, prefer_https: bool = False
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Parse a single WS-Discovery response.
 
         Args:
@@ -307,7 +320,7 @@ class ONVIFDiscovery:
             )
             root = etree.fromstring(xml_data.encode("utf-8"), parser)
 
-            probe_match = probe_match = root.find(".//d:ProbeMatch", self.NAMESPACES)
+            probe_match = root.find(".//d:ProbeMatch", self.NAMESPACES)
             if probe_match is None:
                 probe_match = root.find(".//wsd:ProbeMatch", self.NAMESPACES)
 
@@ -358,11 +371,14 @@ class ONVIFDiscovery:
 
             return device_info
 
-        except Exception:
+        except etree.XMLSyntaxError:
+            return None
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("Error occurred while parsing device info: %s", e)
             return None
 
     def _parse_xaddr(
-        self, device_info: Dict[str, Any], prefer_https: bool = False
+        self, device_info: dict[str, Any], prefer_https: bool = False
     ) -> None:
         """Parse XAddr to extract host, port, and protocol.
 
@@ -400,6 +416,6 @@ class ONVIFDiscovery:
                 device_info["host"] = parts
                 # Set default port based on protocol
                 device_info["port"] = 443 if protocol == "https" else 80
-        except (ValueError, IndexError):
+        except (ValueError, IndexError, KeyError) as e:
             # Failed to parse XAddr
-            pass
+            logger.warning("Error occurred while parsing XAddr %s: %s", xaddr, e)

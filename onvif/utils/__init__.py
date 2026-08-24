@@ -1,4 +1,4 @@
-# onvif/utils/__init__.py
+"""Utility functions and classes for ONVIF operations."""
 
 from .discovery import ONVIFDiscovery
 from .error_handlers import ONVIFErrorHandler

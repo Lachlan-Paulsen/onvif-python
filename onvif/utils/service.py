@@ -1,9 +1,11 @@
-# onvif/utils/service.py
+"""ONVIFService: Base class for all ONVIF service implementations."""
 
+import inspect
 import logging
 
 import zeep.helpers
 
+from ..cli.utils import get_method_documentation
 from .exceptions import ONVIFOperationException
 
 logger = logging.getLogger(__name__)
@@ -96,28 +98,35 @@ class ONVIFService:
                 # convert the object's fields to kwargs instead of passing it as positional arg
                 if len(args) == 1 and not kwargs and _is_zeep_object(args[0]):
                     params_obj = args[0]
-                    logger.debug(f"Converting Zeep object to kwargs for {name}")
+                    logger.debug("Converting Zeep object to kwargs for %s", name)
                     # Extract fields from Zeep object using its XSD type elements
-                    if hasattr(params_obj._xsd_type, "elements"):
+                    if hasattr(
+                        params_obj._xsd_type, "elements"
+                    ):  # pylint: disable=protected-access
                         kwargs = {}
-                        for elem_name, elem_obj in params_obj._xsd_type.elements:
+                        for (
+                            elem_name,
+                            _,
+                        ) in (
+                            params_obj._xsd_type.elements
+                        ):  # pylint: disable=protected-access
                             kwargs[elem_name] = getattr(params_obj, elem_name)
                         return attr(**kwargs)
 
-                logger.debug(f"Calling wrapped ONVIF method: {name}")
+                logger.debug("Calling wrapped ONVIF method: %s", name)
                 result = attr(*args, **kwargs)
-                logger.debug(f"ONVIF method {name} completed successfully")
+                logger.debug("ONVIF method %s completed successfully", name)
                 return result
             except ONVIFOperationException as oe:
                 # Re-raise ONVIF exceptions as-is
                 service_name = getattr(self.operator, "service_name", "Unknown")
-                logger.error(f"{service_name}.{name}: {oe}")
+                logger.error("%s.%s: %s", service_name, name, oe)
                 raise
             except Exception as e:
                 # Convert any other exception (including TypeError) to ONVIFOperationException
                 service_name = getattr(self.operator, "service_name", "Unknown")
-                logger.error(f"{service_name}.{name}: {e}")
-                raise ONVIFOperationException(name, e)
+                logger.error("%s.%s: %s", service_name, name, e)
+                raise ONVIFOperationException(name, e) from e
 
         return wrapped_method
 
@@ -147,8 +156,8 @@ class ONVIFService:
                 if zeep_object is None
                 else zeep.helpers.serialize_object(zeep_object)
             )
-        except Exception as e:
-            logger.error(f"Failed to convert zeep object to dict: {e}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to convert zeep object to dict: %s", e)
             return {}
 
     def type(self, type_name: str):
@@ -189,13 +198,13 @@ class ONVIFService:
             device.SetSystemDateAndTime(time_params)
         """
         try:
-            logger.debug(f"Creating ONVIF type: {type_name}")
+            logger.debug("Creating ONVIF type: %s", type_name)
             result = self.operator.create_type(type_name)
-            logger.debug(f"Successfully created type: {type_name}")
+            logger.debug("Successfully created type: %s", type_name)
             return result
         except Exception as e:
-            logger.error(f"Failed to create type {type_name}: {e}")
-            raise ONVIFOperationException(f"type({type_name})", e)
+            logger.error("Failed to create type %s: %s", type_name, e)
+            raise ONVIFOperationException(f"type({type_name})", e) from e
 
     def desc(self, method_name: str):
         """
@@ -251,7 +260,6 @@ class ONVIFService:
 
             try:
                 # Use object.__getattribute__ to bypass ONVIFService wrapper and get original method
-                import inspect
 
                 method = object.__getattribute__(self, method_name)
                 sig = inspect.signature(method)
@@ -263,17 +271,17 @@ class ONVIFService:
                             optional_args.append(param.name)
 
                 logger.debug(
-                    f"Successfully extracted parameters for {service_name}.{method_name}"
+                    "Successfully extracted parameters for %s.%s",
+                    service_name,
+                    method_name,
                 )
-            except Exception as param_error:
+            except Exception as param_error:  # pylint: disable=broad-except
                 logger.warning(
-                    f"Could not extract parameters for {method_name}: {param_error}"
+                    "Could not extract parameters for %s: %s", method_name, param_error
                 )
 
             # Try to get documentation (optional)
             try:
-                from ..cli.utils import get_method_documentation
-
                 doc_info = get_method_documentation(self, method_name)
                 if doc_info and doc_info.get("doc"):
                     # Only use doc if it's not the default "No description available" message
@@ -288,9 +296,9 @@ class ONVIFService:
                     else:
                         # Set to None if it's the default message
                         doc_text = None
-            except Exception as e:
+            except (OSError, ValueError, AttributeError) as e:
                 logger.warning(
-                    f"Could not retrieve documentation for {method_name}: {e}"
+                    "Could not retrieve documentation for %s: %s", method_name, e
                 )  # Documentation is optional
 
             return {
@@ -300,10 +308,9 @@ class ONVIFService:
                 "method_name": method_name,
                 "service_name": service_name,
             }
-
         except Exception as e:
-            logger.error(f"Failed to get description for method {method_name}: {e}")
-            raise ONVIFOperationException(f"desc({method_name})", e)
+            logger.error("Failed to get description for method %s: %s", method_name, e)
+            raise ONVIFOperationException(f"desc({method_name})", e) from e
 
     def operations(self):
         """
@@ -330,9 +337,11 @@ class ONVIFService:
                 else "Unknown"
             )
             logger.debug(
-                f"Successfully listed operations for {service_name}: {len(operations)} operations found"
+                "Successfully listed operations for %s: %d operations found",
+                service_name,
+                len(operations),
             )
             return sorted(operations)
-        except Exception as e:
-            logger.error(f"Failed to list operations: {e}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to list operations: %s", e)
             return []

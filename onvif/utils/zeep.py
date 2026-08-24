@@ -1,8 +1,8 @@
-# onvif/utils/zeep.py
+"""ZeepPatcher: Patch zeep SOAP library to handle ONVIF xsd:any fields."""
 
 import logging
 
-from lxml.etree import QName
+from lxml.etree import QName  # pylint: disable=no-name-in-module
 from zeep.xsd.elements.any import Any
 from zeep.xsd.utils import max_occurs_iter
 
@@ -341,9 +341,7 @@ class ZeepPatcher:
                     # Check if this is a single-tag wrapper (like {"Capabilities": {...}})
                     # IMPORTANT: We should NOT flatten if the tag name already exists as a field in the schema
                     # This prevents DeviceIO, Recording, etc. from being incorrectly flattened
-                    non_private_keys = [
-                        k for k in value_data.keys() if not k.startswith("_")
-                    ]
+                    non_private_keys = [k for k in value_data if not k.startswith("_")]
 
                     if len(non_private_keys) == 1:
                         # Single tag wrapper - but check if it should be flattened
@@ -382,9 +380,11 @@ class ZeepPatcher:
                                 inner_content = ZeepPatcher._zeep_object_to_dict(
                                     inner_content
                                 )
-                            if tag_name in values and values[tag_name] is None:
-                                values[tag_name] = inner_content
-                            elif tag_name not in values:
+                            if (
+                                tag_name in values
+                                and values[tag_name] is None
+                                or tag_name not in values
+                            ):
                                 values[tag_name] = inner_content
                     else:
                         # Multiple tags - copy all non-private fields to their respective locations
@@ -396,9 +396,11 @@ class ZeepPatcher:
                             if hasattr(val, "__values__") or hasattr(val, "__dict__"):
                                 val = ZeepPatcher._zeep_object_to_dict(val)
 
-                            if key in values and values[key] is None:
-                                values[key] = val
-                            elif key not in values:
+                            if (
+                                key in values
+                                and values[key] is None
+                                or key not in values
+                            ):
                                 values[key] = val
 
                     # Replace _value_N with ONLY the original elements list
@@ -424,9 +426,7 @@ class ZeepPatcher:
                     original_elements = value_data.get("__original_elements__")
 
                     # Check if this is a single-tag wrapper
-                    non_private_keys = [
-                        k for k in value_data.keys() if not k.startswith("_")
-                    ]
+                    non_private_keys = [k for k in value_data if not k.startswith("_")]
 
                     if len(non_private_keys) == 1:
                         # Single tag wrapper - but check if it should be flattened
@@ -460,9 +460,8 @@ class ZeepPatcher:
                                     if (
                                         hasattr(obj, child_key)
                                         and getattr(obj, child_key) is None
+                                        or not hasattr(obj, child_key)
                                     ):
-                                        setattr(obj, child_key, child_val)
-                                    elif not hasattr(obj, child_key):
                                         setattr(obj, child_key, child_val)
                         else:
                             # Not a wrapper - just set the field directly
@@ -476,9 +475,8 @@ class ZeepPatcher:
                             if (
                                 hasattr(obj, tag_name)
                                 and getattr(obj, tag_name) is None
+                                or not hasattr(obj, tag_name)
                             ):
-                                setattr(obj, tag_name, inner_content)
-                            elif not hasattr(obj, tag_name):
                                 setattr(obj, tag_name, inner_content)
                     else:
                         # Multiple tags - copy all non-private fields
@@ -490,9 +488,11 @@ class ZeepPatcher:
                             if hasattr(val, "__values__") or hasattr(val, "__dict__"):
                                 val = ZeepPatcher._zeep_object_to_dict(val)
 
-                            if hasattr(obj, key) and getattr(obj, key) is None:
-                                setattr(obj, key, val)
-                            elif not hasattr(obj, key):
+                            if (
+                                hasattr(obj, key)
+                                and getattr(obj, key) is None
+                                or not hasattr(obj, key)
+                            ):
                                 setattr(obj, key, val)
 
                     # Replace _value_N with ONLY the original elements list
@@ -530,7 +530,9 @@ class ZeepPatcher:
         return obj
 
     @staticmethod
-    def _patched_parse_xmlelements(self, xmlelements, schema, name=None, context=None):
+    def _patched_parse_xmlelements(
+        self, xmlelements, schema, name=None, context=None
+    ):  # pylint: disable=bad-staticmethod-argument disable=unused-argument
         """
         Patched version of zeep's Any.parse_xmlelements method.
 
@@ -602,7 +604,7 @@ class ZeepPatcher:
                             child, schema=schema, allow_none=True, context=context
                         )
                         child_result[child_qname.localname] = val
-                    except Exception:
+                    except Exception:  # pylint: disable=broad-except
                         # If schema lookup fails, try to parse manually
                         parsed = {}
 

@@ -1,4 +1,4 @@
-# onvif/utils/xml_capture.py
+"""ONVIF XMLCapturePlugin: Zeep plugin to capture and inspect SOAP XML requests and responses for ONVIF operations."""
 
 import logging
 
@@ -78,7 +78,7 @@ class XMLCapturePlugin(Plugin):
         self.last_received_xml = None
         self.last_operation = None
         self.history = []  # Store all requests/responses
-        logger.debug(f"XMLCapturePlugin initialized (pretty_print={pretty_print})")
+        logger.debug("XMLCapturePlugin initialized (pretty_print=%s)", pretty_print)
 
     def _format_xml(self, element):
         """
@@ -107,14 +107,16 @@ class XMLCapturePlugin(Plugin):
             )
             logger.debug("XML formatted successfully")
             return xml_string.strip()
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             # Fallback to non-pretty printed version
-            logger.warning(f"XML formatting failed, using fallback: {e}")
+            logger.warning("XML formatting failed, using fallback: %s", e)
             return etree.tostring(element, pretty_print=False, encoding="unicode")
 
     def egress(self, envelope, http_headers, operation, binding_options):
         """Called before sending the SOAP request"""
-        logger.debug(f"Capturing outgoing SOAP request for operation: {operation.name}")
+        logger.debug(
+            "Capturing outgoing SOAP request for operation: %s", operation.name
+        )
 
         # Serialize XML with proper pretty printing
         if self.pretty_print:
@@ -137,14 +139,16 @@ class XMLCapturePlugin(Plugin):
         )
 
         logger.debug(
-            f"Captured SOAP request for {operation.name} ({len(self.last_sent_xml)} chars)"
+            "Captured SOAP request for %s (%d chars)",
+            operation.name,
+            len(self.last_sent_xml),
         )
         return envelope, http_headers
 
     def ingress(self, envelope, http_headers, operation):
         """Called after receiving the SOAP response"""
         logger.debug(
-            f"Capturing incoming SOAP response for operation: {operation.name}"
+            "Capturing incoming SOAP response for operation: %s", operation.name
         )
 
         # Serialize XML with proper pretty printing
@@ -166,7 +170,9 @@ class XMLCapturePlugin(Plugin):
         )
 
         logger.debug(
-            f"Captured SOAP response for {operation.name} ({len(self.last_received_xml)} chars)"
+            "Captured SOAP response for %s (%d chars)",
+            operation.name,
+            len(self.last_received_xml),
         )
         return envelope, http_headers
 
@@ -189,7 +195,7 @@ class XMLCapturePlugin(Plugin):
         self.last_sent_xml = None
         self.last_received_xml = None
         self.last_operation = None
-        logger.debug(f"Cleared XML capture history ({history_count} items)")
+        logger.debug("Cleared XML capture history (%d items)", history_count)
 
     def save_to_file(self, request_file=None, response_file=None):
         """
@@ -203,14 +209,14 @@ class XMLCapturePlugin(Plugin):
             try:
                 with open(request_file, "w", encoding="utf-8") as f:
                     f.write(self.last_sent_xml)
-                logger.info(f"Saved SOAP request XML to: {request_file}")
-            except Exception as e:
-                logger.error(f"Failed to save request XML to {request_file}: {e}")
+                logger.info("Saved SOAP request XML to: %s", request_file)
+            except OSError as e:
+                logger.error("Failed to save request XML to %s: %s", request_file, e)
 
         if response_file and self.last_received_xml:
             try:
                 with open(response_file, "w", encoding="utf-8") as f:
                     f.write(self.last_received_xml)
-                logger.info(f"Saved SOAP response XML to: {response_file}")
-            except Exception as e:
-                logger.error(f"Failed to save response XML to {response_file}: {e}")
+                logger.info("Saved SOAP response XML to: %s", response_file)
+            except OSError as e:
+                logger.error("Failed to save response XML to %s: %s", response_file, e)

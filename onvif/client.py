@@ -1,7 +1,10 @@
-# onvif/client.py
+"""ONVIFClient: High-level ONVIF client for interacting with ONVIF-compliant devices."""
+
+from __future__ import annotations
 
 import logging
 from functools import wraps
+from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 from .operator import CacheMode
@@ -73,12 +76,12 @@ def service(func):
             return func(self, *args, **kwargs)
         except ONVIFOperationException as oe:
             # Re-raise ONVIFOperationException as-is to avoid double-wrapping
-            logger.error(f"Service initialization failed in {func.__name__}: {oe}")
+            logger.error("Service initialization failed in %s: %s", func.__name__, oe)
             raise
         except Exception as e:
             # Wrap any other exception in ONVIFOperationException
-            logger.error(f"Service initialization failed in {func.__name__}: {e}")
-            raise ONVIFOperationException(func.__name__, e)
+            logger.error("Service initialization failed in %s: %s", func.__name__, e)
+            raise ONVIFOperationException(func.__name__, e) from e
 
     return wrapper
 
@@ -111,12 +114,16 @@ class ONVIFClient:
         verify_ssl: bool = True,
         apply_patch: bool = True,
         capture_xml: bool = False,
-        wsdl_dir: str = None,
-        plugins: list = None,
+        wsdl_dir: str | None = None,
+        plugins: list | None = None,
     ):
-        logger.info(f"Initializing ONVIF client for {host}:{port}")
+        logger.info("Initializing ONVIF client for %s:%d", host, port)
         logger.debug(
-            f"Connection settings: HTTPS={use_https}, SSL_verify={verify_ssl}, cache={cache.value}, timeout={timeout}s"
+            "Connection settings: HTTPS=%s, SSL_verify=%s, cache=%s, timeout=%ds",
+            use_https,
+            verify_ssl,
+            cache.value,
+            timeout,
         )
 
         # Apply or remove zeep patch based on user preference
@@ -136,7 +143,7 @@ class ONVIFClient:
         # Merge user plugins with xml_plugin
         all_plugins = []
         if plugins:
-            logger.debug(f"Adding {len(plugins)} user-provided plugins")
+            logger.debug("Adding %d user-provided plugins", len(plugins))
             all_plugins.extend(plugins)
         if self.xml_plugin:
             logger.debug("Adding XML capture plugin")
@@ -145,7 +152,7 @@ class ONVIFClient:
         # Store custom WSDL directory if provided
         self.wsdl_dir = wsdl_dir
         if wsdl_dir:
-            logger.debug(f"Using custom WSDL directory: {wsdl_dir}")
+            logger.debug("Using custom WSDL directory: %s", wsdl_dir)
             ONVIFWSDL.set_custom_wsdl_dir(wsdl_dir)
 
         # Pass to ONVIFOperator
@@ -185,36 +192,38 @@ class ONVIFClient:
             # Try GetServices first (preferred method)
             logger.debug("Attempting GetServices call for service discovery")
             self.services = self._devicemgmt.GetServices(IncludeCapability=False)
-            logger.info(f"Found {len(self.services)} services via GetServices")
+            logger.info("Found %d services via GetServices", len(self.services))
 
-            for service in self.services:
-                namespace = getattr(service, "Namespace", None)
-                xaddr = getattr(service, "XAddr", None)
+            for onvif_service in self.services:
+                namespace = getattr(onvif_service, "Namespace", None)
+                xaddr = getattr(onvif_service, "XAddr", None)
 
                 if namespace and xaddr:
                     self._service_map[namespace] = xaddr
-                    logger.debug(f"Mapped service: {namespace} -> {xaddr}")
-
-        except Exception as e:
-            logger.warning(f"GetServices failed: {e}")
+                    logger.debug("Mapped service: %s -> %s", namespace, xaddr)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("GetServices failed: %s", e)
             # Fallback to GetCapabilities if GetServices is not supported on device
             try:
                 logger.debug("Falling back to GetCapabilities")
                 self.capabilities = self._devicemgmt.GetCapabilities(Category="All")
                 logger.info("Successfully retrieved device capabilities")
-            except Exception as e2:
+            except Exception as e2:  # pylint: disable=broad-except
                 # If both fail, we'll use default URLs
-                logger.error(f"Both GetServices and GetCapabilities failed: {e2}")
+                logger.error("Both GetServices and GetCapabilities failed: %s", e2)
                 logger.warning("Using default URLs for services")
-                pass
 
         # Lazy init for other services
 
         self._events = None
-        self._pullpoints = {}  # Dictionary for multiple PullPoint instances
+        self._pullpoints: dict[str, Any] = (
+            {}
+        )  # Dictionary for multiple PullPoint instances
         self._notification = None
-        self._subscriptions = {}  # Dictionary for multiple Subscription instances
-        self._pausable_subscriptions = (
+        self._subscriptions: dict[str, Any] = (
+            {}
+        )  # Dictionary for multiple Subscription instances
+        self._pausable_subscriptions: dict[str, Any] = (
             {}
         )  # Dictionary for multiple PausableSubscription instances
 
@@ -294,7 +303,7 @@ class ONVIFClient:
               And GetCapabilities is mandatory for ONVIF devices, so it's more widely supported.
             - Fallback to default URL ensures basic connectivity even if the device lacks proper service discovery.
         """
-        logger.debug(f"Resolving XAddr for service: {service_name} ({service_path})")
+        logger.debug("Resolving XAddr for service: %s (%s)", service_name, service_path)
 
         # First try to get from GetServices mapping
         if self.services:
@@ -304,13 +313,15 @@ class ONVIFClient:
                 # Try to get the service definition from WSDL_MAP
                 # Most services use ver10, some use ver20
                 wsdl_def = None
+                wsdl_map = ONVIFWSDL.get_wsdl_map()
+                service_map = wsdl_map.get(service_name)
 
                 # Try ver10 first, then ver20
-                if service_name in ONVIFWSDL.WSDL_MAP:
-                    if "ver10" in ONVIFWSDL.WSDL_MAP[service_name]:
-                        wsdl_def = ONVIFWSDL.WSDL_MAP[service_name]["ver10"]
-                    elif "ver20" in ONVIFWSDL.WSDL_MAP[service_name]:
-                        wsdl_def = ONVIFWSDL.WSDL_MAP[service_name]["ver20"]
+                if service_map is not None:
+                    if "ver10" in service_map:
+                        wsdl_def = service_map["ver10"]
+                    elif "ver20" in service_map:
+                        wsdl_def = service_map["ver20"]
 
                 if wsdl_def:
                     namespace = wsdl_def["namespace"]
@@ -320,14 +331,15 @@ class ONVIFClient:
                         # Rewrite host/port if needed
                         rewritten = self._rewrite_xaddr_if_needed(xaddr)
                         logger.debug(
-                            f"Resolved via GetServices: {service_name} -> {rewritten}"
+                            "Resolved via GetServices: %s -> %s",
+                            service_name,
+                            rewritten,
                         )
                         return rewritten
-            except Exception as e:
+            except (ValueError, TypeError, KeyError) as e:
                 logger.debug(
-                    f"Service {service_name} not found in GetServices mapping: {e}"
+                    "Service %s not found in GetServices mapping: %s", service_name, e
                 )
-                pass
 
         # If not found in service map and we have capabilities, try to get it dynamically from GetCapabilities
         if self.capabilities:
@@ -355,19 +367,22 @@ class ONVIFClient:
                     # Rewrite host/port if needed
                     rewritten = self._rewrite_xaddr_if_needed(xaddr)
                     logger.debug(
-                        f"Resolved via GetCapabilities: {service_name} -> {rewritten}"
+                        "Resolved via GetCapabilities: %s -> %s",
+                        service_name,
+                        rewritten,
                     )
                     return rewritten
-            except Exception as e:
+            except (AttributeError, ValueError, TypeError, KeyError) as e:
                 logger.debug(
-                    f"Service {service_name} not found in GetCapabilities mapping: {e}"
+                    "Service %s not found in GetCapabilities mapping: %s",
+                    service_name,
+                    e,
                 )
-                pass
 
         # Fallback to default URL
         protocol = "https" if self.common_args["use_https"] else "http"
         default_url = f"{protocol}://{self.common_args['host']}:{self.common_args['port']}/onvif/{service_path}"
-        logger.warning(f"Using default URL for {service_name}: {default_url}")
+        logger.warning("Using default URL for %s: %s", service_name, default_url)
         return default_url
 
     def _rewrite_xaddr_if_needed(self, xaddr: str):
@@ -385,19 +400,20 @@ class ONVIFClient:
                 protocol = "https" if self.common_args["use_https"] else "http"
                 new_netloc = f"{connect_host}:{connect_port}"
                 rewritten = urlunparse((protocol, new_netloc, parsed.path, "", "", ""))
-                logger.debug(f"Rewritten XAddr: {xaddr} -> {rewritten}")
+                logger.debug("Rewritten XAddr: %s -> %s", xaddr, rewritten)
                 return rewritten
 
-            logger.debug(f"XAddr unchanged: {xaddr}")
+            logger.debug("XAddr unchanged: %s", xaddr)
             return xaddr
-        except Exception as e:
-            logger.warning(f"Failed to parse XAddr {xaddr}, returning as-is: {e}")
+        except (ValueError, TypeError, KeyError) as e:
+            logger.warning("Failed to parse XAddr %s, returning as-is: %s", xaddr, e)
             return xaddr
 
     # Core (Device Management)
 
     @service
     def devicemgmt(self):
+        """Access the Device Management service."""
         if self._devicemgmt is None:
             logger.debug("Initializing Device Management service")
             self._devicemgmt = Device(**self.common_args)
@@ -407,6 +423,7 @@ class ONVIFClient:
 
     @service
     def events(self):
+        """Access the Events service."""
         if self._events is None:
             logger.debug("Initializing Events service")
             self._events = Events(
@@ -415,14 +432,15 @@ class ONVIFClient:
         return self._events
 
     @service
-    def pullpoint(self, SubscriptionRef):
+    def pullpoint(self, SubscriptionRef):  # pylint: disable=invalid-name
+        """Access the PullPoint service."""
         logger.debug("Initializing PullPoint service")
         xaddr = None
         addr_obj = SubscriptionRef["SubscriptionReference"]["Address"]
         if isinstance(addr_obj, dict) and "_value_1" in addr_obj:
             xaddr = addr_obj["_value_1"]
         elif hasattr(addr_obj, "_value_1"):
-            xaddr = addr_obj._value_1
+            xaddr = addr_obj._value_1  # pylint: disable=protected-access
 
         xaddr = self._rewrite_xaddr_if_needed(xaddr)
 
@@ -438,6 +456,7 @@ class ONVIFClient:
 
     @service
     def notification(self):
+        """Access the Notification service."""
         if self._notification is None:
             logger.debug("Initializing Notification service")
             self._notification = Notification(
@@ -446,14 +465,15 @@ class ONVIFClient:
         return self._notification
 
     @service
-    def subscription(self, SubscriptionRef):
+    def subscription(self, SubscriptionRef):  # pylint: disable=invalid-name
+        """Access the Subscription service."""
         logger.debug("Initializing Subscription service")
         xaddr = None
         addr_obj = SubscriptionRef["SubscriptionReference"]["Address"]
         if isinstance(addr_obj, dict) and "_value_1" in addr_obj:
             xaddr = addr_obj["_value_1"]
         elif hasattr(addr_obj, "_value_1"):
-            xaddr = addr_obj._value_1
+            xaddr = addr_obj._value_1  # pylint: disable=protected-access
 
         xaddr = self._rewrite_xaddr_if_needed(xaddr)
 
@@ -468,14 +488,15 @@ class ONVIFClient:
         return self._subscriptions[xaddr]
 
     @service
-    def pausable_subscription(self, SubscriptionRef):
+    def pausable_subscription(self, SubscriptionRef):  # pylint: disable=invalid-name
+        """Access the PausableSubscription service."""
         logger.debug("Initializing PausableSubscription service")
         xaddr = None
         addr_obj = SubscriptionRef["SubscriptionReference"]["Address"]
         if isinstance(addr_obj, dict) and "_value_1" in addr_obj:
             xaddr = addr_obj["_value_1"]
         elif hasattr(addr_obj, "_value_1"):
-            xaddr = addr_obj._value_1
+            xaddr = addr_obj._value_1  # pylint: disable=protected-access
 
         xaddr = self._rewrite_xaddr_if_needed(xaddr)
 
@@ -495,6 +516,7 @@ class ONVIFClient:
 
     @service
     def imaging(self):
+        """Access the Imaging service."""
         if self._imaging is None:
             logger.debug("Initializing Imaging service")
             self._imaging = Imaging(
@@ -506,6 +528,7 @@ class ONVIFClient:
 
     @service
     def media(self):
+        """Access the Media service."""
         if self._media is None:
             logger.debug("Initializing Media service")
             self._media = Media(
@@ -515,6 +538,7 @@ class ONVIFClient:
 
     @service
     def media2(self):
+        """Access the Media2 service."""
         if self._media2 is None:
             logger.debug("Initializing Media2 service")
             self._media2 = Media2(
@@ -526,6 +550,7 @@ class ONVIFClient:
 
     @service
     def ptz(self):
+        """Access the PTZ service."""
         if self._ptz is None:
             logger.debug("Initializing PTZ service")
             self._ptz = PTZ(xaddr=self._get_xaddr("ptz", "PTZ"), **self.common_args)
@@ -535,6 +560,7 @@ class ONVIFClient:
 
     @service
     def deviceio(self):
+        """Access the DeviceIO service."""
         if self._deviceio is None:
             logger.debug("Initializing DeviceIO service")
             self._deviceio = DeviceIO(
@@ -546,6 +572,7 @@ class ONVIFClient:
 
     @service
     def display(self):
+        """Access the Display service."""
         if self._display is None:
             logger.debug("Initializing Display service")
             self._display = Display(
@@ -557,6 +584,7 @@ class ONVIFClient:
 
     @service
     def analytics(self):
+        """Access the Analytics service."""
         if self._analytics is None:
             logger.debug("Initializing Analytics service")
             self._analytics = Analytics(
@@ -566,6 +594,7 @@ class ONVIFClient:
 
     @service
     def ruleengine(self):
+        """Access the RuleEngine service."""
         if self._ruleengine is None:
             logger.debug("Initializing RuleEngine service")
             self._ruleengine = RuleEngine(
@@ -575,6 +604,7 @@ class ONVIFClient:
 
     @service
     def analyticsdevice(self):
+        """Access the AnalyticsDevice service."""
         if self._analyticsdevice is None:
             logger.debug("Initializing AnalyticsDevice service")
             self._analyticsdevice = AnalyticsDevice(
@@ -587,6 +617,7 @@ class ONVIFClient:
 
     @service
     def accesscontrol(self):
+        """Access the AccessControl service."""
         if self._accesscontrol is None:
             logger.debug("Initializing AccessControl service")
             self._accesscontrol = AccessControl(
@@ -597,6 +628,7 @@ class ONVIFClient:
 
     @service
     def doorcontrol(self):
+        """Access the DoorControl service."""
         if self._doorcontrol is None:
             logger.debug("Initializing DoorControl service")
             self._doorcontrol = DoorControl(
@@ -608,6 +640,7 @@ class ONVIFClient:
 
     @service
     def accessrules(self):
+        """Access the AccessRules service."""
         if self._accessrules is None:
             logger.debug("Initializing AccessRules service")
             self._accessrules = AccessRules(
@@ -619,6 +652,7 @@ class ONVIFClient:
 
     @service
     def actionengine(self):
+        """Access the ActionEngine service."""
         if self._actionengine is None:
             logger.debug("Initializing ActionEngine service")
             self._actionengine = ActionEngine(
@@ -631,6 +665,7 @@ class ONVIFClient:
 
     @service
     def appmanagement(self):
+        """Access the AppManagement service."""
         if self._appmanagement is None:
             logger.debug("Initializing AppManagement service")
             self._appmanagement = AppManagement(
@@ -643,6 +678,7 @@ class ONVIFClient:
 
     @service
     def authenticationbehavior(self):
+        """Access the AuthenticationBehavior service."""
         if self._authenticationbehavior is None:
             logger.debug("Initializing AuthenticationBehavior service")
             self._authenticationbehavior = AuthenticationBehavior(
@@ -657,6 +693,7 @@ class ONVIFClient:
 
     @service
     def credential(self):
+        """Access the Credential service."""
         if self._credential is None:
             logger.debug("Initializing Credential service")
             self._credential = Credential(
@@ -669,6 +706,7 @@ class ONVIFClient:
 
     @service
     def recording(self):
+        """Access the Recording service."""
         if self._recording is None:
             logger.debug("Initializing Recording service")
             self._recording = Recording(
@@ -681,6 +719,7 @@ class ONVIFClient:
 
     @service
     def replay(self):
+        """Access the Replay service."""
         if self._replay is None:
             logger.debug("Initializing Replay service")
             self._replay = Replay(
@@ -693,6 +732,7 @@ class ONVIFClient:
 
     @service
     def provisioning(self):
+        """Access the Provisioning service."""
         if self._provisioning is None:
             logger.debug("Initializing Provisioning service")
             self._provisioning = Provisioning(
@@ -705,6 +745,7 @@ class ONVIFClient:
 
     @service
     def receiver(self):
+        """Access the Receiver service."""
         if self._receiver is None:
             logger.debug("Initializing Receiver service")
             self._receiver = Receiver(
@@ -717,6 +758,7 @@ class ONVIFClient:
 
     @service
     def schedule(self):
+        """Access the Schedule service."""
         if self._schedule is None:
             logger.debug("Initializing Schedule service")
             self._schedule = Schedule(
@@ -729,6 +771,7 @@ class ONVIFClient:
 
     @service
     def search(self):
+        """Access the Search service."""
         if self._search is None:
             logger.debug("Initializing Search service")
             self._search = Search(
@@ -741,6 +784,7 @@ class ONVIFClient:
 
     @service
     def thermal(self):
+        """Access the Thermal service."""
         if self._thermal is None:
             logger.debug("Initializing Thermal service")
             self._thermal = Thermal(
@@ -753,6 +797,7 @@ class ONVIFClient:
 
     @service
     def uplink(self):
+        """Access the Uplink service."""
         if self._uplink is None:
             logger.debug("Initializing Uplink service")
             self._uplink = Uplink(
@@ -761,10 +806,11 @@ class ONVIFClient:
             )
         return self._uplink
 
-    # Security - AdvancedSecurity
+    # Security / AdvancedSecurity
 
     @service
     def security(self):
+        """Access the AdvancedSecurity service."""
         if self._security is None:
             logger.debug("Initializing Security service")
             self._security = AdvancedSecurity(
@@ -774,6 +820,7 @@ class ONVIFClient:
 
     @service
     def jwt(self):
+        """Access the JWT service."""
         if self._jwt is None:
             logger.debug("Initializing JWT service")
             self._jwt = JWT(**self.common_args)
@@ -781,6 +828,7 @@ class ONVIFClient:
 
     @service
     def keystore(self, xaddr):
+        """Access the Keystore service."""
         if self._keystore is None:
             logger.debug("Initializing Keystore service")
             xaddr = self._rewrite_xaddr_if_needed(xaddr)
@@ -789,6 +837,7 @@ class ONVIFClient:
 
     @service
     def tlsserver(self, xaddr):
+        """Access the TLSServer service."""
         if self._tlsserver is None:
             logger.debug("Initializing TLSServer service")
             xaddr = self._rewrite_xaddr_if_needed(xaddr)
@@ -797,6 +846,7 @@ class ONVIFClient:
 
     @service
     def dot1x(self, xaddr):
+        """Access the Dot1X service."""
         if self._dot1x is None:
             logger.debug("Initializing Dot1X service")
             xaddr = self._rewrite_xaddr_if_needed(xaddr)
@@ -805,6 +855,7 @@ class ONVIFClient:
 
     @service
     def authorizationserver(self, xaddr):
+        """Access the AuthorizationServer service."""
         if self._authorizationserver is None:
             logger.debug("Initializing AuthorizationServer service")
             xaddr = self._rewrite_xaddr_if_needed(xaddr)
@@ -815,6 +866,7 @@ class ONVIFClient:
 
     @service
     def mediasigning(self, xaddr):
+        """Access the MediaSigning service."""
         if self._mediasigning is None:
             logger.debug("Initializing MediaSigning service")
             xaddr = self._rewrite_xaddr_if_needed(xaddr)

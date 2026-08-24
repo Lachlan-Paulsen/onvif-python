@@ -1,4 +1,4 @@
-# onvif/utils/error_handlers.py
+"""ONVIFErrorHandler: Error handling utilities for ONVIF operations."""
 
 import logging
 
@@ -67,9 +67,8 @@ class ONVIFErrorHandler:
                         elif "ActionNotSupported" in str(subcode):
                             logger.debug("Detected ActionNotSupported fault in subcode")
                             return True
-        except Exception as e:
-            logger.debug(f"Error checking ActionNotSupported: {e}")
-            pass
+        except OSError as e:
+            logger.debug("Error checking ActionNotSupported: %s", e)
 
         return False
 
@@ -84,16 +83,16 @@ class ONVIFErrorHandler:
             # Check if it's ActionNotSupported error
             if ignore_unsupported and ONVIFErrorHandler.is_action_not_supported(e):
                 if log_error:
-                    logger.warning(f"Operation not supported: {e.operation}")
+                    logger.warning("Operation not supported: %s", e.operation)
                 return default
             # Re-raise other errors
             if log_error:
-                logger.error(f"ONVIF operation failed in safe_call: {e.operation}")
+                logger.error("ONVIF operation failed in safe_call: %s", e.operation)
             raise
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             # Wrap unexpected exceptions
             if log_error:
-                logger.error(f"Unexpected error in safe_call: {e}")
+                logger.error("Unexpected error in safe_call: %s", e)
             raise
 
     @staticmethod
@@ -106,16 +105,16 @@ class ONVIFErrorHandler:
         def wrapper(*args, **kwargs):
             try:
                 result = func(*args, **kwargs)
-                logger.debug(f"Decorated function {func.__name__} succeeded")
+                logger.debug("Decorated function %s succeeded", func.__name__)
                 return result
             except ONVIFOperationException as e:
                 if ONVIFErrorHandler.is_action_not_supported(e):
                     logger.warning(
-                        f"Operation not supported in {func.__name__}: {e.operation}"
+                        "Operation not supported in %s: %s", func.__name__, e.operation
                     )
                     return None
                 logger.error(
-                    f"ONVIF operation failed in {func.__name__}: {e.operation}"
+                    "ONVIF operation failed in %s: %s", func.__name__, e.operation
                 )
                 raise
 

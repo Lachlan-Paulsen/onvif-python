@@ -1,7 +1,10 @@
-# onvif/utils/wsdl.py
+"""ONVIFWSDL: WSDL file manager for ONVIF services with support for built-in and custom WSDL dir."""
+
+from __future__ import annotations
 
 import logging
 import os
+from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -79,7 +82,7 @@ class ONVIFWSDL:
             >>> ONVIFWSDL.set_custom_wsdl_dir("/home/user/my_wsdls")
             >>> # All subsequent get_definition calls will use this directory
         """
-        logger.info(f"Setting custom WSDL directory: {custom_dir}")
+        logger.info("Setting custom WSDL directory: %s", custom_dir)
         cls._custom_wsdl_dir = custom_dir
 
     @classmethod
@@ -656,7 +659,9 @@ class ONVIFWSDL:
             },
         }
 
-    WSDL_MAP = None  # Will be initialized when first accessed
+    WSDL_MAP: ClassVar[dict[str, dict[str, Any]] | None] = (
+        None  # Will be initialized when first accessed
+    )
 
     @classmethod
     def _ensure_wsdl_map_initialized(cls):
@@ -667,6 +672,13 @@ class ONVIFWSDL:
         """
         if cls.WSDL_MAP is None:
             cls.WSDL_MAP = cls._get_wsdl_map()
+
+    @classmethod
+    def get_wsdl_map(cls) -> dict[str, dict[str, Any]]:
+        """Get the complete WSDL map for all services."""
+        cls._ensure_wsdl_map_initialized()
+        assert cls.WSDL_MAP is not None
+        return cls.WSDL_MAP
 
     @classmethod
     def get_definition(
@@ -696,11 +708,11 @@ class ONVIFWSDL:
             - Custom WSDLs must match the service name exactly
             - File existence is validated before returning definition
         """
-        logger.debug(f"Getting WSDL definition for service: {service} ({version})")
+        logger.debug("Getting WSDL definition for service: %s (%s)", service, version)
 
         # Use custom WSDL map if custom directory is provided
         if custom_wsdl_dir:
-            logger.debug(f"Using custom WSDL directory: {custom_wsdl_dir}")
+            logger.debug("Using custom WSDL directory: %s", custom_wsdl_dir)
             wsdl_map = cls._get_wsdl_map(custom_wsdl_dir)
         else:
             # Ensure default WSDL_MAP is initialized
@@ -713,16 +725,16 @@ class ONVIFWSDL:
             raise RuntimeError("Failed to initialize WSDL map")
 
         if service not in wsdl_map:
-            logger.error(f"Unknown service: {service}")
+            logger.error("Unknown service: %s", service)
             raise ValueError(f"Unknown service: {service}")
         if version not in wsdl_map[service]:
-            logger.error(f"Version {version} not available for {service}")
+            logger.error("Version %s not available for %s", version, service)
             raise ValueError(f"Version {version} not available for {service}")
 
         definition = wsdl_map[service][version]
         if not os.path.exists(definition["path"]):
-            logger.error(f"WSDL file not found: {definition['path']}")
+            logger.error("WSDL file not found: %s", definition["path"])
             raise FileNotFoundError(f"WSDL file not found: {definition['path']}")
 
-        logger.debug(f"WSDL definition resolved: {definition['path']}")
+        logger.debug("WSDL definition resolved: %s", definition["path"])
         return definition

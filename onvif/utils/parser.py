@@ -1,7 +1,8 @@
-# onvif/utils/parser.py
+"""ONVIFParser: Zeep plugin to extract XML elements from SOAP responses using XPath."""
+
+from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
 
 from zeep import Plugin
 
@@ -10,8 +11,7 @@ logger.addHandler(logging.NullHandler())
 
 
 class ONVIFParser(Plugin):
-    """
-    Lightweight Zeep plugin to extract XML elements from SOAP responses using XPath.
+    """Lightweight Zeep plugin to extract XML elements from SOAP responses using XPath.
 
     This plugin extracts specific XML elements from raw SOAP responses before zeep
     parses them into Python objects. This is useful for extracting data that zeep
@@ -59,22 +59,23 @@ class ONVIFParser(Plugin):
         - Works with any XPath expression
     """
 
-    def __init__(self, extract_xpaths: Dict[str, str]):
+    def __init__(self, extract_xpaths: dict[str, str]):
         """
         Initialize XML element parser.
 
         Args:
-            extract_xpaths: Dictionary mapping names to XPath expressions. XPath expressions will be used to find elements in SOAP response.
+            extract_xpaths: Dictionary mapping names to XPath expressions.
+                            XPath expressions will be used to find elements in SOAP response.
             Example: {
                 'topic': './/{http://docs.oasis-open.org/wsn/b-2}Topic',
                 'custom': './/ns:CustomElement'
             }
         """
         self.extract_xpaths = extract_xpaths
-        self._extracted_elements = {}
+        self._extracted_elements: dict[str, list[str | None]] = {}
 
         logger.debug(
-            f"ONVIFParser initialized with XPaths: {list(extract_xpaths.keys())}"
+            "ONVIFParser initialized with XPaths: %s", list(extract_xpaths.keys())
         )
 
     def ingress(self, envelope, http_headers, operation):
@@ -84,7 +85,8 @@ class ONVIFParser(Plugin):
         Extracts element texts from raw XML envelope using configured XPath expressions.
         The envelope at this stage is an lxml Element tree, allowing XPath queries.
 
-        Cache is automatically cleared before extracting new elements to prevent memory accumulation.
+        Cache is automatically cleared before extracting new elements
+        to prevent memory accumulation.
 
         Args:
             envelope: lxml Element representing SOAP envelope
@@ -95,7 +97,7 @@ class ONVIFParser(Plugin):
             Tuple of (envelope, http_headers) to pass to next plugin
         """
         # Auto-clear cache from previous response
-        self._extracted_elements = {}
+        self._extracted_elements: dict[str, list[str | None]] = {}
 
         try:
             # Extract elements using XPath from raw XML envelope
@@ -108,15 +110,15 @@ class ONVIFParser(Plugin):
                 if texts:
                     self._extracted_elements[name] = texts
                     logger.debug(
-                        f"ONVIFParser: Extracted {len(texts)} '{name}' elements"
+                        "ONVIFParser: Extracted %d '%s' elements", len(texts), name
                     )
 
-        except Exception as e:
-            logger.warning(f"ONVIFParser: Failed to extract elements: {e}")
+        except (ValueError, TypeError, AttributeError) as e:
+            logger.warning("ONVIFParser: Failed to extract elements: %s", e)
 
         return envelope, http_headers
 
-    def get_extracted_texts(self, name: str, count: int) -> List[Optional[str]]:
+    def get_extracted_texts(self, name: str, count: int) -> list[str | None]:
         """
         Get extracted element texts by name.
 

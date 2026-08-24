@@ -1,4 +1,4 @@
-# onvif/utils/exceptions.py
+"""ONVIFOperationException: Enhanced exception wrapper for ONVIF operation failures."""
 
 import requests
 from zeep.exceptions import Fault
@@ -98,7 +98,7 @@ class ONVIFOperationException(Exception):
                             # Fallback to string representation
                             subcode_strings.append(str(qname))
                     subcodes = ", ".join(subcode_strings)
-                except Exception:
+                except (AttributeError, TypeError, ValueError):
                     subcodes = str(subcodes)
 
             # Build comprehensive error message
@@ -130,15 +130,15 @@ class ONVIFOperationException(Exception):
                     else:
                         detail_text = str(detail)
                     parts.append(f"detail={detail_text}")
-                except Exception:
+                except (AttributeError, TypeError, ValueError):
                     # Fallback to string representation
-                    parts.append(f"detail={str(detail)}")
+                    parts.append(f"detail={detail!s}")
 
             msg = f"{category}: {', '.join(parts)}"
         elif isinstance(original_exception, requests.exceptions.RequestException):
             # Transport/Protocol error
             category = "Protocol Error"
-            msg = f"{category}: {str(original_exception)}"
+            msg = f"{category}: {original_exception!s}"
         else:
             # Application or generic error
             category = "Application Error"
